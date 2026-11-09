@@ -148,8 +148,15 @@ adminRoutes.post('/songs/:id/state', async (c) => {
   const id = c.req.param('id');
   const { state } = await c.req.json<{ state: string }>();
   if (!STATES.includes(state as never)) return c.json({ error: 'Unknown state' }, 400);
+  const prev = await c.env.DB.prepare('SELECT publish_state FROM songs WHERE id = ?').bind(id).first<{ publish_state: string }>();
   await c.env.DB.prepare(`UPDATE songs SET publish_state = ?, updated_at = datetime('now')${state === 'published' ? ", published_at = datetime('now')" : ''} WHERE id = ?`).bind(state, id).run();
   await audit(c as Ctx, `state:${state}`, id);
+  // The public site is static: going live or leaving it needs a rebuild. GitHub queues these, so
+  // publishing several taraney in a row ends in one up-to-date site.
+  if (state === 'published' || prev?.publish_state === 'published') {
+    const r = await dispatch(c as Ctx, 'publish.yml', {});
+    return c.json({ ok: true, site: r.ok ? 'rebuilding' : 'not-connected', note: r.ok ? undefined : r.error });
+  }
   return c.json({ ok: true });
 });
 

@@ -74,7 +74,11 @@ function Details({ song, reload }: { song: FullSong; reload: () => void }) {
   };
   const setState = async (state: string) => {
     if (state === 'published' && song.issues.length && !confirm(`This tarana has ${song.issues.length} issue(s). Publish anyway?`)) return;
-    await api.post(`/admin/songs/${song.id}/state`, { state }); toast(`Now ${STATE_LABEL[state].toLowerCase()}`); reload();
+    const r = await api.post<{ site?: string; note?: string }>(`/admin/songs/${song.id}/state`, { state });
+    if (r.site === 'rebuilding') toast(`Now ${STATE_LABEL[state].toLowerCase()}. The public site updates in about 2 minutes.`);
+    else if (r.site === 'not-connected') toast(`Now ${STATE_LABEL[state].toLowerCase()}, but the site was not rebuilt: ${r.note}`, 'err');
+    else toast(`Now ${STATE_LABEL[state].toLowerCase()}`);
+    reload();
   };
   const remove = async () => {
     if (!confirm('Delete this tarana and its recordings? A copy stays in version history, but the audio files are removed.')) return;
