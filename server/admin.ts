@@ -242,8 +242,9 @@ async function dispatch(c: Ctx, workflow: string, inputs: Record<string, string 
 
 adminRoutes.post('/recordings/:rid/ingest', async (c) => {
   const rid = c.req.param('rid');
-  const rec = await c.env.DB.prepare('SELECT song_id, youtube_id FROM recordings WHERE id = ?').bind(rid).first<{ song_id: string; youtube_id: string | null }>();
-  if (!rec?.youtube_id) return c.json({ error: 'Only YouTube recordings can be fetched.' }, 400);
+  const rec = await c.env.DB.prepare('SELECT song_id, youtube_id, audio_key FROM recordings WHERE id = ?').bind(rid).first<{ song_id: string; youtube_id: string | null; audio_key: string | null }>();
+  // Hosted audio: AI lyrics + timing only. YouTube-only: download first.
+  if (!rec?.youtube_id && !rec?.audio_key) return c.json({ error: 'This recording has no audio or YouTube link.' }, 400);
   const { timing = true } = await c.req.json<{ timing?: boolean }>().catch(() => ({ timing: true }));
   const jobId = newId('job');
   await c.env.DB.prepare("INSERT INTO jobs (id, type, status, step, input, song_id) VALUES (?, 'ingest', 'queued', 'waiting for GitHub', ?, ?)")

@@ -63,6 +63,7 @@
 .section-edit__cols { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
 .rec-row { display: grid; grid-template-columns: auto 1fr auto auto auto; gap: var(--space-4); align-items: center; padding: var(--space-3) 0; border-top: 1px solid var(--color-outline-variant); }
 .rec-row__text { display: grid; min-width: 0; }
+.rec-row__actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 
 /* Inbox */
 .empty { justify-items: center; color: var(--color-on-surface-muted); padding: var(--space-10); }

@@ -4,7 +4,7 @@
 //   npm run ingest -- --recording rec-xxxx [--job job-xxxx] [--local] [--no-timing]
 // Needs: python -m yt_dlp, GEMINI_API_KEY (unless --no-ai), and wrangler auth for --remote.
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { d1Read, d1Write, q, wrangler } from './d1.ts';
 import { join, resolve } from 'node:path';
 import ffmpeg from 'ffmpeg-static';
@@ -34,13 +34,39 @@ const job = (status: string, step: string, extra = '') => {
 const log = (s: string) => console.log(`[ingest] ${s}`);
 
 async function main() {
-  const rec = read(`SELECT r.id, r.song_id, r.youtube_id, r.source_url, s.doc FROM recordings r JOIN songs s ON s.id = r.song_id WHERE r.id = ${q(recId)}`)[0];
+  const rec = read(`SELECT r.id, r.song_id, r.kind, r.audio_key, r.youtube_id, r.source_url, s.doc FROM recordings r JOIN songs s ON s.id = r.song_id WHERE r.id = ${q(recId)}`)[0];
   if (!rec) throw new Error(`Recording ${recId} not found`);
-  const url = (rec.source_url as string) || (rec.youtube_id ? `https://www.youtube.com/watch?v=${rec.youtube_id}` : '');
-  if (!url) throw new Error('Recording has no YouTube link');
   rmSync(WORK, { recursive: true, force: true });
   mkdirSync(WORK, { recursive: true });
 
+  const out = join(WORK, 'out.m4a');
+  let durationMs: number | null = null;
+  let description = '';
+
+  if (rec.audio_key) {
+    // Audio already hosted (uploaded in the admin, or ingested before): no YouTube download, AI steps only.
+    job('running', 'fetch audio');
+    const key = rec.audio_key as string;
+    if (key.startsWith('samples/')) copyFileSync(join('public', key), out);
+    else {
+      log(`fetching ${key} from R2`);
+      wrangler(['r2', 'object', 'get', `taraney-media/${key}`, `--file=${out}`, LOCAL ? '--local' : '--remote']);
+    }
+    durationMs = probeMs(out);
+  } else {
+    const url = (rec.source_url as string) || (rec.youtube_id ? `https://www.youtube.com/watch?v=${rec.youtube_id}` : '');
+    if (!url) throw new Error('Recording has neither audio nor a YouTube link');
+    ({ durationMs, description } = await fromYouTube(url, rec, out));
+  }
+  await aiSteps(rec, out, durationMs, description);
+}
+
+const probeMs = (file: string) => {
+  const m = /Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(spawnSync(ffmpeg as unknown as string, ['-hide_banner', '-i', file], { encoding: 'utf8' }).stderr || '');
+  return m ? Math.round((+m[1] * 3600 + +m[2] * 60 + +m[3]) * 1000) : null;
+};
+
+async function fromYouTube(url: string, rec: Record<string, unknown>, out: string) {
   // 1. Download audio + metadata (description). Owner content; no cookies or bot-check workarounds.
   job('running', 'download');
   log(`downloading ${url}`);
@@ -56,12 +82,10 @@ async function main() {
 
   // 2. Normalise loudness, AAC 96k, faststart (seekable).
   job('running', 'normalise');
-  const out = join(WORK, 'out.m4a');
   const ff = spawnSync(ffmpeg as unknown as string, ['-y', '-hide_banner', '-i', join(WORK, src), '-vn', '-map_metadata', '-1',
     '-af', 'loudnorm=I=-16:TP=-1.5:LRA=11', '-ar', '44100', '-c:a', 'aac', '-b:a', '96k', '-movflags', '+faststart', out], { encoding: 'utf8' });
   if (ff.status !== 0) throw new Error(`ffmpeg failed: ${(ff.stderr || '').split('\n').slice(-2).join(' ')}`);
-  const m = /Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(spawnSync(ffmpeg as unknown as string, ['-hide_banner', '-i', out], { encoding: 'utf8' }).stderr || '');
-  const durationMs = m ? Math.round((+m[1] * 3600 + +m[2] * 60 + +m[3]) * 1000) : null;
+  const durationMs = probeMs(out);
 
   // 3. Upload to R2.
   job('running', 'upload');
@@ -71,7 +95,10 @@ async function main() {
     '--cache-control=public, max-age=31536000, immutable', LOCAL ? '--local' : '--remote']);
   sql(`UPDATE recordings SET kind = 'audio', audio_key = ${q(key)}, duration_ms = ${durationMs ?? 'NULL'}, updated_at = datetime('now') WHERE id = ${q(recId)};
        UPDATE songs SET updated_at = datetime('now') WHERE id = ${q(rec.song_id)};`);
+  return { durationMs, description: String(info.description || '') };
+}
 
+async function aiSteps(rec: Record<string, unknown>, out: string, durationMs: number | null, descriptionIn: string) {
   if (NO_AI || !process.env.GEMINI_API_KEY) {
     log(NO_AI ? 'AI steps skipped (--no-ai)' : 'GEMINI_API_KEY not set: audio ready, no lyrics/timing drafted');
     job('done', 'audio ready');
@@ -88,7 +115,7 @@ async function main() {
     let doc = JSON.parse((rec.doc as string) || '{"sections":[],"structure":[]}');
     if (!doc.sections?.length) {
       job('running', 'lyrics');
-      const description = String(info.description || '').slice(0, 8000);
+      const description = descriptionIn.slice(0, 8000) || '(no description available; transcribe from the audio)';
       log('drafting lyrics with Gemini');
       const res = await ai.models.generateContent({
         model: MODEL,

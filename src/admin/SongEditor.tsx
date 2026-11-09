@@ -261,7 +261,16 @@ function Recordings({ song, reload }: { song: FullSong; reload: () => void }) {
               <span class="t-body-sm c-muted">{r.kind === 'audio' ? 'Hosted audio' : `YouTube · ${r.youtube_id}`}{r.is_primary ? ' · primary' : ''} · {r.sync_level ? `${r.lines.length} lines synced` : 'not synced'}</span>
             </span>
             {r.kind === 'audio'
-              ? <a class="btn btn--primary btn--sm interactive" href={`#/songs/${song.id}/audio?rec=${r.id}`}><Icon name="lyrics" />{r.sync_level ? 'Edit sync' : 'Sync lyrics'}</a>
+              ? <span class="rec-row__actions">
+                  <button class="btn btn--secondary btn--sm interactive"
+                    title={song.doc.sections.length ? 'Gemini drafts line timings from this audio (replaces current timing)' : 'Gemini writes the lyrics from this audio, then drafts line timings'}
+                    onClick={async () => {
+                      if (r.sync_level && !confirm('Replace the current timing with a new AI draft?')) return;
+                      try { await api.post(`/admin/recordings/${r.id}/ingest`, { timing: true }); toast('Started on GitHub. Takes 1 to 3 minutes; refresh to see it.'); }
+                      catch (x) { toast((x as Error).message, 'err'); }
+                    }}><Icon name="sparkles" />{song.doc.sections.length ? 'AI sync' : 'AI lyrics + sync'}</button>
+                  <a class="btn btn--primary btn--sm interactive" href={`#/songs/${song.id}/audio?rec=${r.id}`}><Icon name="lyrics" />{r.sync_level ? 'Edit sync' : 'Sync by hand'}</a>
+                </span>
               : <button class="btn btn--secondary btn--sm interactive" title="GitHub Actions downloads the audio, drafts lyrics if missing and drafts line timings"
                   onClick={async () => {
                     try { await api.post(`/admin/recordings/${r.id}/ingest`, { timing: true }); toast('Started on GitHub. Takes 2 to 5 minutes; refresh to see the audio.'); }
