@@ -9,7 +9,7 @@ import { activeCue, buildTimeline, cueIndexAt, formatTime } from '../lib/timelin
 import type { Recording, SongDoc } from '../lib/types';
 import type { PubRecording } from '../data/load';
 import { player, usePlayer, type PlayerRec } from './store';
-import { library } from './library';
+import { library } from './user-library';
 import ShareSheet, { Sheet, type ShareLine } from './ShareSheet';
 
 export interface ReaderSong {

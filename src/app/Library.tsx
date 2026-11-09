@@ -1,7 +1,7 @@
 import { useState } from 'preact/hooks';
 import { Icon } from '../components/ui/Icon';
 import { TaranaCard } from '../components/ui/content';
-import { useLibrary, library } from './library';
+import { useLibrary, library } from './user-library';
 
 export default function Library() {
   const [tab, setTab] = useState<'saved' | 'recent'>('saved');
