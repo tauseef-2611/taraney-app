@@ -1,23 +1,13 @@
 // Exports songs from D1 into src/data/songs.generated.json for the static Astro build.
 //   npm run content          local D1, includes drafts (marked "Unreviewed draft") for development
 //   npm run content:prod     remote D1, published songs only (used by the publish workflow)
-import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { d1Read } from './d1.ts';
 
 const remote = process.argv.includes('--remote');
 const all = process.argv.includes('--all') || (!remote && !process.argv.includes('--published'));
 const states = all ? "('draft','review','published')" : "('published')";
-
-function query(sql: string): Record<string, unknown>[] {
-  // SQL goes through a file: on Windows the shell would mangle a multi-line --command argument.
-  mkdirSync('.wrangler', { recursive: true });
-  writeFileSync('.wrangler/export-query.sql', sql.replace(/\s+/g, ' ') + ';');
-  const out = execFileSync('npx', ['wrangler', 'd1', 'execute', 'taraney-db', remote ? '--remote' : '--local', '--json', '--file=.wrangler/export-query.sql', '-y'], {
-    encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, shell: process.platform === 'win32', stdio: ['ignore', 'pipe', 'inherit'],
-  });
-  const json = JSON.parse(out.slice(out.indexOf('[')));
-  return json[0]?.results || [];
-}
+const query = (sql: string) => d1Read(remote, sql);
 const parse = (s: unknown, d: unknown) => { try { return typeof s === 'string' ? JSON.parse(s) : d; } catch { return d; } };
 const audioUrl = (key: string | null) => (!key ? null : key.startsWith('samples/') ? `/${key}` : `/api/media/${key}`);
 

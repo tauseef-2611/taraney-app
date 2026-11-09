@@ -3,8 +3,9 @@
 // (b) draft line timings. Runs in GitHub Actions (ingest.yml) or locally:
 //   npm run ingest -- --recording rec-xxxx [--job job-xxxx] [--local] [--no-timing]
 // Needs: python -m yt_dlp, GEMINI_API_KEY (unless --no-ai), and wrangler auth for --remote.
-import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { d1Read, d1Write, q, wrangler } from './d1.ts';
 import { join, resolve } from 'node:path';
 import ffmpeg from 'ffmpeg-static';
 import { GoogleGenAI, Type, createPartFromUri } from '@google/genai';
@@ -23,14 +24,9 @@ const WORK = resolve('.ingest', recId || 'x');
 const shell = process.platform === 'win32';
 if (!recId) { console.error('Usage: npm run ingest -- --recording <id> [--job <id>] [--local]'); process.exit(2); }
 
-const q = (v: unknown) => (v === null || v === undefined ? 'NULL' : `'${String(v).replace(/'/g, "''")}'`);
-function sql(statement: string): Record<string, unknown>[] {
-  mkdirSync('.wrangler', { recursive: true });
-  writeFileSync('.wrangler/ingest.sql', statement);
-  const out = execFileSync('npx', ['wrangler', 'd1', 'execute', 'taraney-db', LOCAL ? '--local' : '--remote', '--json', '--file=.wrangler/ingest.sql', '-y'],
-    { encoding: 'utf8', shell, maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'inherit'] });
-  return JSON.parse(out.slice(out.indexOf('[')))[0]?.results || [];
-}
+// Reads return rows (--command); writes go through a file (remote --file returns no rows).
+const read = (statement: string) => d1Read(!LOCAL, statement);
+const sql = (statement: string) => d1Write(!LOCAL, statement);
 const job = (status: string, step: string, extra = '') => {
   if (!jobId) return;
   sql(`UPDATE jobs SET status = ${q(status)}, step = ${q(step)}${extra}, updated_at = datetime('now') WHERE id = ${q(jobId)};`);
@@ -38,7 +34,7 @@ const job = (status: string, step: string, extra = '') => {
 const log = (s: string) => console.log(`[ingest] ${s}`);
 
 async function main() {
-  const rec = sql(`SELECT r.*, s.doc, s.title_ur, s.title_ro FROM recordings r JOIN songs s ON s.id = r.song_id WHERE r.id = ${q(recId)};`)[0];
+  const rec = read(`SELECT r.id, r.song_id, r.youtube_id, r.source_url, s.doc FROM recordings r JOIN songs s ON s.id = r.song_id WHERE r.id = ${q(recId)}`)[0];
   if (!rec) throw new Error(`Recording ${recId} not found`);
   const url = (rec.source_url as string) || (rec.youtube_id ? `https://www.youtube.com/watch?v=${rec.youtube_id}` : '');
   if (!url) throw new Error('Recording has no YouTube link');
@@ -71,8 +67,8 @@ async function main() {
   job('running', 'upload');
   const key = `audio/${rec.song_id}/${recId}.m4a`;
   log(`uploading to R2 ${key}`);
-  execFileSync('npx', ['wrangler', 'r2', 'object', 'put', `taraney-media/${key}`, `--file=${out}`, '--content-type=audio/mp4',
-    '--cache-control=public, max-age=31536000, immutable', LOCAL ? '--local' : '--remote'], { stdio: 'inherit', shell });
+  wrangler(['r2', 'object', 'put', `taraney-media/${key}`, `--file=${out}`, '--content-type=audio/mp4',
+    '--cache-control=public, max-age=31536000, immutable', LOCAL ? '--local' : '--remote']);
   sql(`UPDATE recordings SET kind = 'audio', audio_key = ${q(key)}, duration_ms = ${durationMs ?? 'NULL'}, updated_at = datetime('now') WHERE id = ${q(recId)};
        UPDATE songs SET updated_at = datetime('now') WHERE id = ${q(rec.song_id)};`);
 
