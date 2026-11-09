@@ -16,7 +16,7 @@ ALLOWED_ORIGINS = "http://localhost:4321,http://127.0.0.1:4321,http://localhost:
 [[d1_databases]]
 binding = "DB"
 database_name = "taraney-db"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "b6eead5a-52ab-40c2-8efc-0819c91b2c9c"
 migrations_dir = "migrations"
 
 [[r2_buckets]]
@@ -37,7 +37,7 @@ ALLOWED_ORIGINS = ""
 [[env.production.d1_databases]]
 binding = "DB"
 database_name = "taraney-db"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "b6eead5a-52ab-40c2-8efc-0819c91b2c9c"
 migrations_dir = "migrations"
 
 [[env.production.r2_buckets]]
