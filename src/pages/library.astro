@@ -1,0 +1,10 @@
+---
+import App from '../layouts/App.astro';
+import Library from '../app/Library';
+---
+<App title="Library · Taraney" tab="library">
+  <div class="page">
+    <h1 class="t-headline-md">Library</h1>
+    <Library client:load />
+  </div>
+</App>

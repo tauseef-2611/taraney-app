@@ -1,0 +1,44 @@
+{
+  "name": "taraney-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro build && wrangler pages dev --port 8788",
+    "setup": "npm run db:migrate:local && npm run db:import:local && node scripts/copy-sample-audio.mjs",
+    "db:migrate:local": "wrangler d1 migrations apply taraney-db --local",
+    "db:migrate:prod": "wrangler d1 migrations apply taraney-db --remote",
+    "db:import:local": "node --no-warnings --experimental-strip-types scripts/import-songs.ts --local",
+    "db:import:prod": "node --no-warnings --experimental-strip-types scripts/import-songs.ts --remote",
+    "db:reset:local": "node scripts/reset-local.mjs && npm run setup",
+    "test": "vitest run",
+    "audit:contrast": "vitest run test/contrast.test.ts --reporter=dot",
+    "dev:full": "npm run content && node scripts/dev.mjs",
+    "db:seed:demo": "node --no-warnings --experimental-strip-types scripts/seed-demo.ts",
+    "content": "node --no-warnings --experimental-strip-types scripts/export-content.ts",
+    "content:prod": "node --no-warnings --experimental-strip-types scripts/export-content.ts --remote --published",
+    "ingest": "node --no-warnings --experimental-strip-types scripts/ingest.ts",
+    "deploy": "npm run content:prod && npm run build && npx wrangler pages deploy dist --project-name=taraney --branch=main"
+  },
+  "dependencies": {
+    "@astrojs/preact": "^6.0.6",
+    "@fontsource-variable/plus-jakarta-sans": "^5.3.0",
+    "@fontsource/gulzar": "^5.3.0",
+    "@google/genai": "^3.0.0",
+    "astro": "^7.3.8",
+    "ffmpeg-static": "^5.3.0",
+    "hono": "^4.13.17",
+    "preact": "^10.29.8"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261108.1",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0",
+    "wrangler": "^4.158.0"
+  }
+}

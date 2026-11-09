@@ -1,0 +1,12 @@
+---
+import App from '../layouts/App.astro';
+import { Icon } from '../components/ui/Icon';
+---
+<App title="Offline · Taraney">
+  <div class="empty-state">
+    <Icon name="offline" />
+    <p class="t-title-lg">You are offline</p>
+    <p>Taraney you saved for offline still open from your Library.</p>
+    <a class="btn btn--primary interactive" href="/library/">Open Library</a>
+  </div>
+</App>

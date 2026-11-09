@@ -1,0 +1,357 @@
+---
+// Taraney design system: every value comes from src/design/tokens.ts.
+import Base from '../layouts/Base.astro';
+import { SEEDS, palettes, schemes, resolve, AUDIT_PAIRS, gradients, type as typeScale, space, radius, elevation, motion } from '../design/tokens';
+import { STRIP_TONES, contrast } from '../design/color';
+import { MOODS, MOOD_LABELS } from '../lib/mood';
+import { Icon } from '../components/ui/Icon';
+import { Button, IconButton, Fab, Chip, Badge } from '../components/ui/controls';
+import { Artwork, TaranaCard, SongHeader } from '../components/ui/content';
+import PlayerDemo from '../components/demo/PlayerDemo';
+import { ReaderDemo, ControlsDemo, ThemeSwitch } from '../components/demo/InteractiveDemos';
+import sample from '../../fixtures/sample-song.json';
+import p026 from '../../fixtures/p026.json';
+import type { Song } from '../lib/types';
+
+const sampleSong = sample as unknown as Song;
+const p026Doc = { sections: p026.sections, structure: p026.structure } as Song['doc'];
+
+const seedRows = [
+  { key: 'primary', label: 'Primary', note: 'Antique gold · actions, active line', hex: SEEDS.primary },
+  { key: 'secondary', label: 'Secondary', note: 'Brass · progress, secondary accents', hex: SEEDS.secondary },
+  { key: 'tertiary', label: 'Tertiary', note: 'Deep emerald · depth, calm surfaces', hex: SEEDS.tertiary },
+  { key: 'neutral', label: 'Neutral', note: 'Charcoal · the shell', hex: SEEDS.neutral },
+] as const;
+
+const roleGroups = [
+  ['primary', 'on-primary', 'primary-container', 'on-primary-container', 'accent'],
+  ['secondary', 'on-secondary', 'secondary-container', 'on-secondary-container'],
+  ['tertiary', 'on-tertiary', 'tertiary-container', 'on-tertiary-container'],
+  ['error', 'on-error', 'error-container', 'on-error-container'],
+  ['surface-container-lowest', 'surface-container-low', 'surface-container', 'surface-container-high', 'surface-container-highest'],
+  ['on-surface', 'on-surface-variant', 'on-surface-muted', 'outline', 'outline-variant'],
+  ['paper', 'paper-2', 'ink', 'ink-2', 'ink-accent', 'highlight'],
+] as const;
+
+
+// Cards covering every missing-data case (the UI must adapt, never show empty labels).
+const cases = [
+  { label: 'Urdu + Roman, audio, synced', song: { id: 'up-3be63c7c72', title_ur: sampleSong.title_ur, title_ro: sampleSong.title_ro, genre: 'tarana', has_audio: true, synced: true } },
+  { label: 'Urdu only, no audio', song: { id: 'p026', title_ur: p026.title_ur, genre: 'dua', themes: p026.themes } },
+  { label: 'Roman only, YouTube video', song: { id: 'demo-roman', title_ro: 'Hum ko apni manzil pyari', genre: 'nazm', has_video: true } },
+  { label: 'Audio, no timing', song: { id: 'demo-audio', title_ur: 'لب پہ آتی ہے دعا بن کے تمنا میری', title_ro: 'Lab pe aati hai dua ban ke tamanna meri', genre: 'dua', poet_ro: 'Allama Iqbal', has_audio: true } },
+  { label: 'No genre, no poet, nothing else', song: { id: 'demo-bare', title_ur: 'اے وطن', title_ro: 'Ae watan' } },
+  { label: 'Children, lament: mood override', song: { id: 'demo-gham', title_ro: 'Falasteen ke bachche', genre: 'nazm', themes: ['falasteen'] } },
+];
+
+const moodSamples = MOODS.map((m, i) => ({ id: `mood-${m}-${i}`, mood: m, title_ur: MOOD_LABELS[m].ur, title_ro: MOOD_LABELS[m].ro }));
+const sameSong = { id: 'p026', title_ur: 'عزمِ محکم عطا کر خدایا', title_ro: 'Azm-e mohkam ata kar khudaya', genre: 'dua', has_audio: true };
+const sections = ['Brand', 'Color', 'Gradients', 'Type', 'Scales', 'Controls', 'Artwork', 'Cards', 'Reading', 'Player'];
+---
+<Base title="Taraney · Design system" description="Taraney design system: tokens, components and the interactive player.">
+  <header class="ds-top">
+    <a href="/" class="ds-brand"><span class="ds-brand__ur" lang="ur">ترانے</span><span class="t-title-md">Taraney</span><span class="badge">Design system v0.1</span></a>
+    <nav class="ds-nav" aria-label="Sections">{sections.map((s) => <a class="chip interactive" href={`#${s.toLowerCase()}`}>{s}</a>)}</nav>
+    <ThemeSwitch client:load />
+  </header>
+
+  <main class="ds">
+    <!-- Brand -->
+    <section id="brand" class="ds-section">
+      <div class="ds-hero card card--glow">
+        <div>
+          <p class="t-label-sm c-primary">Tarana library</p>
+          <h1 class="ds-wordmark"><span lang="ur">ترانے</span><span>Taraney</span></h1>
+          <p class="t-body-lg c-variant" style="max-width: 46ch">Read, listen and sing along to Urdu taraney. Calm, editorial and content-first: the lyrics matter as much as the audio.</p>
+        </div>
+        <div class="ds-hero__art"><Artwork song={sameSong} variant="hero" showTitle animated /></div>
+      </div>
+      <div class="ds-principles">
+        {[
+          ['lyrics', 'Content first', 'Reading is as important as listening. Ivory surfaces where Urdu is long-form.'],
+          ['sparkles', 'Restrained gold', 'Gold marks only what matters now: the action, the active line, focus.'],
+          ['shapes', 'Adaptive', 'Missing data hides cleanly. No empty labels, no fake players.'],
+          ['music', 'Line-level sync', 'Whole-line highlight with follow-scroll. No word timing.'],
+        ].map(([icon, h, p]) => (
+          <div class="card ds-pad"><span class="icon-btn icon-btn--tonal icon-btn--sm"><Icon name={icon as any} /></span><h3 class="t-title-md" style="margin-top:12px">{h}</h3><p class="t-body-md c-variant">{p}</p></div>
+        ))}
+      </div>
+    </section>
+
+    <!-- Color -->
+    <section id="color" class="ds-section">
+      <h2 class="ds-h">Color</h2>
+      <p class="ds-lead">Four seeds expand into tonal palettes (OKLCH, gamut-clipped). Components never use these tones directly; they use roles.</p>
+      <div class="ds-grid ds-grid--4">
+        {seedRows.map((r) => (
+          <div class="ds-seed">
+            <div class="ds-seed__head" style={`background:${r.hex}; color:${palettes[r.key][r.key === 'neutral' || r.key === 'tertiary' ? 95 : 15]}`}>
+              <span class="t-title-sm">{r.label}</span><span class="t-label-md">{r.hex}</span>
+            </div>
+            <div class="ds-strip">{STRIP_TONES.map((t) => <span title={`${r.key}-${t} ${palettes[r.key][t]}`} style={`background:${palettes[r.key][t]}`} />)}</div>
+            <p class="t-body-sm c-muted ds-seed__note">{r.note}</p>
+          </div>
+        ))}
+      </div>
+
+      <h3 class="ds-h3">Roles · dark (identity) and light (opt-in)</h3>
+      <div class="ds-roles">
+        {(['dark', 'light'] as const).map((s) => (
+          <div class="card ds-pad ds-scheme" data-theme={s}>
+            <p class="t-label-sm c-muted">{s}</p>
+            {roleGroups.map((g) => (
+              <div class="ds-role-row">{g.map((r) => {
+                const hex = resolve(schemes[s][r]);
+                return <div class="ds-role"><span class="ds-role__sw" style={`background:${hex}`} /><span class="t-label-md">{r}</span><span class="t-body-sm c-muted">{hex}</span></div>;
+              })}</div>
+            ))}
+          </div>
+        ))}
+      </div>
+
+      <h3 class="ds-h3">Contrast audit · every pair the components use (WCAG 2)</h3>
+      <p class="t-body-md c-variant">Enforced by <code>npm run audit:contrast</code>; a failing pair fails the tests.</p>
+      {(['dark', 'light'] as const).map((s) => (
+        <div class="ds-contrast-scheme" data-theme={s}>
+          <p class="t-label-sm c-muted">{s}</p>
+          <div class="ds-contrast">
+            {AUDIT_PAIRS.map(([fg, bg, min, use]) => {
+              const ratio = contrast(resolve(schemes[s][fg]), resolve(schemes[s][bg]));
+              return (
+                <div class="ds-contrast__item" style={`background:var(--color-${bg}); color:var(--color-${fg})`}>
+                  <span class="t-title-sm">Aa · {use}</span><span class="t-body-sm">{fg} on {bg}</span>
+                  <span class="t-label-md">{ratio.toFixed(1)}:1 {ratio >= min ? '✓' : '✗'} (min {min})</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </section>
+
+    <!-- Gradients -->
+    <section id="gradients" class="ds-section">
+      <h2 class="ds-h">Soft gradients</h2>
+      <p class="ds-lead">Subtle, slow light. Built from role variables, so they follow the scheme. Never loud, never everywhere.</p>
+      <div class="ds-grid ds-grid--4">
+        {Object.keys(gradients).map((g) => (
+          <div class="ds-grad"><div class="ds-grad__sw" style={`background:var(--gradient-${g})`} /><span class="t-label-md">--gradient-{g}</span></div>
+        ))}
+      </div>
+    </section>
+
+    <!-- Type -->
+    <section id="type" class="ds-section">
+      <h2 class="ds-h">Typography</h2>
+      <div class="ds-grid ds-grid--3">
+        <div class="card ds-specimen"><div class="ds-specimen__meta"><span>Headline</span><span>Gulzar</span></div><span class="ds-aa ds-aa--display">Aa</span><span class="ds-aa-ur" lang="ur">ترانہ</span></div>
+        <div class="card ds-specimen"><div class="ds-specimen__meta"><span>Body</span><span>Plus Jakarta Sans</span></div><span class="ds-aa ds-aa--body">Aa</span></div>
+        <div class="card ds-specimen"><div class="ds-specimen__meta"><span>Urdu lyrics</span><span>Gulzar Nastaliq</span></div><span class="ds-aa-ur ds-aa-ur--lg" lang="ur">عزمِ محکم</span></div>
+      </div>
+      <div class="card ds-pad ds-scale">
+        {Object.entries(typeScale).map(([k, [fam, w, size, lh]]) => (
+          <div class="ds-scale__row">
+            <span class="t-label-md c-muted">{k}<br /><span class="t-body-sm">{fam} {w} · {size}/{lh}</span></span>
+            {fam === 'urdu'
+              ? <span class={`t-${k}`} lang="ur">حوصلوں کو نئی زندگی دے</span>
+              : <span class={`t-${k}`}>{k.startsWith('label') ? 'Listen with lyrics' : k.startsWith('lyric') ? 'Hauslon ko nayi zindagi de' : 'Azm-e mohkam ata kar khudaya'}</span>}
+          </div>
+        ))}
+      </div>
+      <h3 class="ds-h3">Nastaliq line-height test</h3>
+      <div class="ds-grid ds-grid--3">
+        {['2.1', '2.3', '2.5'].map((lh) => (
+          <div class="card card--paper ds-pad" style="color: var(--color-ink)">
+            <p class="t-label-sm" style="color: var(--color-ink-3)">line-height {lh}</p>
+            <p lang="ur" style={`font: var(--type-lyric-ur); line-height:${lh}; text-align:right`}>سر اٹھائے ہیں ہر سو اندھیرے<br />شب چراغوں کو اب روشنی دے<br />محمد ﷺ کی سنت</p>
+          </div>
+        ))}
+      </div>
+    </section>
+
+    <!-- Scales -->
+    <section id="scales" class="ds-section">
+      <h2 class="ds-h">Space, radius, elevation, motion</h2>
+      <div class="ds-grid ds-grid--2">
+        <div class="card ds-pad">
+          <p class="t-label-sm c-muted">space</p>
+          {Object.entries(space).map(([k, v]) => <div class="ds-space"><span class="t-label-md">{k}</span><span class="ds-space__bar" style={`width:${v}px`} /><span class="t-body-sm c-muted">{v}px</span></div>)}
+        </div>
+        <div class="card ds-pad" style="display:grid; gap: var(--space-6)">
+          <div><p class="t-label-sm c-muted">radius</p><div class="ds-row">{Object.entries(radius).filter(([k]) => k !== 'none').map(([k, v]) => <div class="ds-radius" style={`border-radius:${Math.min(v, 40)}px`}><span class="t-label-sm">{k}</span></div>)}</div></div>
+          <div><p class="t-label-sm c-muted">elevation</p><div class="ds-row">{Object.keys(elevation).map((k) => <div class="ds-elev" style={`box-shadow:var(--elevation-${k})`}><span class="t-label-sm">{k}</span></div>)}</div></div>
+          <div><p class="t-label-sm c-muted">motion</p>{Object.entries(motion).map(([k, v]) => <p class="t-body-sm"><span class="c-primary">--{k}</span> <span class="c-muted">{v}</span></p>)}</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Controls -->
+    <section id="controls" class="ds-section">
+      <h2 class="ds-h">Controls</h2>
+      <div class="ds-grid ds-grid--3">
+        <div class="card ds-pad ds-stack">
+          <p class="t-label-sm c-muted">Buttons</p>
+          <div class="ds-row"><Button>Primary</Button><Button variant="secondary">Secondary</Button></div>
+          <div class="ds-row"><Button variant="inverted">Inverted</Button><Button variant="outlined">Outlined</Button></div>
+          <div class="ds-row"><Button variant="tonal" icon="download">Tonal</Button><Button variant="text">Text</Button></div>
+          <div class="ds-row"><Button size="lg" icon="play">Listen</Button><Button size="sm" variant="secondary" icon="share">Share</Button></div>
+          <div class="ds-row"><Button disabled>Disabled</Button><Button variant="outlined" disabled>Disabled</Button></div>
+        </div>
+        <div class="card ds-pad ds-stack">
+          <p class="t-label-sm c-muted">Icon buttons & FAB</p>
+          <div class="ds-row"><IconButton icon="sparkles" label="Generate" variant="primary" /><IconButton icon="shapes" label="Moods" variant="secondary" /><IconButton icon="tag" label="Tags" variant="tertiary" /><IconButton icon="trash" label="Delete" variant="error" /></div>
+          <div class="ds-row"><IconButton icon="heart" label="Save" variant="tonal" /><IconButton icon="share" label="Share" variant="outlined" /><IconButton icon="download" label="Download" /><IconButton icon="more" label="More" /></div>
+          <div class="ds-row"><Fab icon="edit" label="Edit" /><Fab icon="edit" label="Label" extended primary /></div>
+        </div>
+        <div class="card ds-pad ds-stack">
+          <p class="t-label-sm c-muted">Chips & badges</p>
+          <div class="chip-row"><Chip>Tarana</Chip><Chip selected icon="tag">Selected</Chip><Chip accent icon="sparkles">Josh</Chip></div>
+          <div class="chip-row"><Badge>Unreviewed draft</Badge><Badge tone="primary" icon="lyrics">Synced</Badge><Badge tone="tertiary" icon="download">Offline</Badge></div>
+          <div class="notice"><Icon name="info" /><span>Notices carry calm, factual messages. Gold icon only.</span></div>
+        </div>
+      </div>
+      <div class="card ds-pad" style="margin-top: var(--space-5)">
+        <p class="t-label-sm c-muted" style="margin-bottom: var(--space-5)">Interactive · search, filter chips, progress, tab bar (Home · Explore · Library)</p>
+        <ControlsDemo client:visible />
+      </div>
+    </section>
+
+    <!-- Artwork -->
+    <section id="artwork" class="ds-section">
+      <h2 class="ds-h">Living artwork</h2>
+      <p class="ds-lead">No uploads, no editor. Mood comes from genre and themes; the song id picks background, tint, texture, light position, motion and title layout. Gradient stand-ins until the 20 mood images are generated.</p>
+      <div class="ds-grid ds-grid--moods">
+        {moodSamples.map((m) => (
+          <figure class="ds-mood">
+            <Artwork song={m} showTitle animated />
+            <figcaption><span class="t-title-sm">{MOOD_LABELS[m.mood].ro}</span><span class="t-body-sm c-muted">{MOOD_LABELS[m.mood].feel}</span></figcaption>
+          </figure>
+        ))}
+      </div>
+      <h3 class="ds-h3">One song, same artwork everywhere</h3>
+      <div class="ds-same">
+        <div><p class="t-label-sm c-muted">Card</p><Artwork song={sameSong} /></div>
+        <div><p class="t-label-sm c-muted">Hero</p><Artwork song={sameSong} variant="hero" showTitle animated /></div>
+        <div><p class="t-label-sm c-muted">Share preview 1200×630</p><Artwork song={sameSong} variant="share" showTitle /></div>
+        <div><p class="t-label-sm c-muted">Mini-player</p><Artwork song={sameSong} size="sm" /></div>
+      </div>
+    </section>
+
+    <!-- Cards -->
+    <section id="cards" class="ds-section">
+      <h2 class="ds-h">Cards & missing data</h2>
+      <p class="ds-lead">The same component for every data shape. Nothing empty is ever shown.</p>
+      <div class="ds-grid ds-grid--cards">
+        {cases.map((c) => <div><p class="t-label-sm c-muted ds-case">{c.label}</p><TaranaCard song={c.song} /></div>)}
+      </div>
+      <div class="ds-grid ds-grid--2" style="margin-top: var(--space-6)">
+        <div class="card ds-pad ds-stack">
+          <p class="t-label-sm c-muted">List rows · Roman leads, Urdu supports (a single script leads alone)</p>
+          {cases.map((c) => <TaranaCard song={c.song} layout="row" />)}
+        </div>
+        <div class="card ds-pad"><p class="t-label-sm c-muted" style="margin-bottom: var(--space-4)">Tarana header (unreviewed draft)</p><SongHeader song={{ ...cases[3].song }} reviewed={false} /></div>
+      </div>
+    </section>
+
+    <!-- Reading -->
+    <section id="reading" class="ds-section">
+      <h2 class="ds-h">Reading surface</h2>
+      <p class="ds-lead">p026 from your book, no audio. Ivory surface for long Urdu reading; mode switch shows only scripts that exist.</p>
+      <div class="ds-reader"><ReaderDemo client:visible doc={p026Doc} /></div>
+    </section>
+
+    <!-- Player -->
+    <section id="player" class="ds-section">
+      <h2 class="ds-h">Player</h2>
+      <p class="ds-lead">Real recording from the POC with tap-timed line sync. Tap a line to jump; scroll the lyrics to pause follow. Prev and next jump by line.</p>
+      <div class="ds-player"><PlayerDemo client:visible song={sampleSong} /></div>
+    </section>
+  </main>
+
+  <footer class="ds-foot t-body-sm c-muted">Taraney design system · tokens in <code>src/design/tokens.ts</code> · components in <code>src/components/ui</code></footer>
+</Base>
+
+<style is:global>
+  .ds-top { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: var(--space-5); padding: var(--space-4) var(--gutter);
+    background: color-mix(in oklab, var(--color-bg) 82%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--color-outline-variant); }
+  .ds-brand { display: flex; align-items: center; gap: var(--space-3); flex: none; }
+  .ds-brand__ur { font: var(--type-headline-sm); line-height: 1.4; color: var(--color-accent); }
+  .ds-nav { display: flex; gap: var(--space-2); overflow-x: auto; flex: 1; scrollbar-width: none; }
+  .ds-nav .chip { height: 28px; }
+  .ds { max-width: var(--wide-max); margin: 0 auto; padding: var(--space-8) var(--gutter) var(--space-12); display: grid; gap: var(--space-12); }
+  .ds-section { display: grid; gap: var(--space-5); scroll-margin-top: 128px; }
+  .ds-h { font: var(--type-headline-lg); }
+  .ds-h3 { font: var(--type-title-md); margin-top: var(--space-5); }
+  .ds-lead { font: var(--type-body-lg); color: var(--color-on-surface-variant); max-width: 70ch; }
+  .ds-pad { padding: var(--space-6); }
+  .ds-stack { display: grid; gap: var(--space-4); align-content: start; }
+  .ds-row { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; }
+  .ds-grid { display: grid; gap: var(--space-5); }
+  .ds-grid--2 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); }
+  .ds-grid--3 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
+  .ds-grid--4 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); }
+  .ds-grid--moods { grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); }
+  .ds-grid--cards { grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); }
+
+  .ds-hero { display: grid; grid-template-columns: 1.3fr 1fr; gap: var(--space-8); padding: var(--space-8); align-items: center; }
+  .ds-hero__art .artwork { max-height: 420px; width: 100%; }
+  .ds-wordmark { display: grid; margin: var(--space-4) 0; }
+  .ds-wordmark [lang='ur'] { font: var(--type-display-lg); font-size: 72px; line-height: 1.5; color: var(--color-accent); text-align: start; direction: rtl; justify-self: start; }
+  .ds-wordmark span:last-child { font: var(--type-display-md); }
+  .ds-principles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: var(--space-5); }
+  .ds-principles h3 + p { margin-top: var(--space-2); }
+
+  .ds-seed { border-radius: var(--radius-xl); overflow: hidden; background: var(--color-surface-container); }
+  .ds-seed__head { display: flex; justify-content: space-between; align-items: flex-start; height: 96px; padding: var(--space-5); }
+  .ds-strip { display: grid; grid-template-columns: repeat(12, 1fr); height: 40px; }
+  .ds-seed__note { padding: var(--space-4) var(--space-5); }
+  .ds-roles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr)); gap: var(--space-5); }
+  .ds-scheme { color: var(--color-on-surface); }
+  .ds-role-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--space-3); margin-top: var(--space-4); }
+  .ds-role { display: grid; grid-template-columns: 28px 1fr; column-gap: var(--space-3); align-items: center; }
+  .ds-role__sw { grid-row: span 2; width: 28px; height: 28px; border-radius: var(--radius-sm); box-shadow: inset 0 0 0 1px rgb(128 128 128 / .3); }
+  .ds-contrast-scheme { display: grid; gap: var(--space-3); padding: var(--space-5); border-radius: var(--radius-xl); background: var(--color-bg); color: var(--color-on-bg); box-shadow: inset 0 0 0 1px var(--color-outline-variant); }
+  .ds-contrast { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); gap: var(--space-3); }
+  .ds-contrast__item { display: grid; gap: var(--space-2); padding: var(--space-4); border-radius: var(--radius-md); box-shadow: inset 0 0 0 1px var(--color-outline-variant); justify-items: start; }
+
+  .ds-grad { display: grid; gap: var(--space-3); }
+  .ds-grad__sw { height: 120px; border-radius: var(--radius-lg); box-shadow: inset 0 0 0 1px var(--color-outline-variant); }
+
+  .ds-specimen { position: relative; min-height: 220px; padding: var(--space-6); overflow: hidden; display: grid; }
+  .ds-specimen__meta { display: flex; justify-content: space-between; font: var(--type-label-md); color: var(--color-on-surface-muted); }
+  .ds-aa { justify-self: end; align-self: end; line-height: .9; }
+  .ds-aa--display { font: var(--type-display-lg); font-size: 120px; line-height: 1; color: var(--color-on-surface); }
+  .ds-aa--body { font-family: var(--font-sans); font-size: 120px; font-weight: 500; line-height: 1; color: var(--color-on-surface-variant); }
+  .ds-aa-ur { position: absolute; left: var(--space-6); bottom: var(--space-6); font: var(--type-headline-md); line-height: 2; color: var(--color-accent); }
+  .ds-aa-ur--lg { position: static; justify-self: end; align-self: end; font: var(--type-display-md); line-height: 2; color: var(--color-on-surface-variant); }
+  .ds-scale { display: grid; gap: var(--space-2); }
+  .ds-scale__row { display: grid; grid-template-columns: 180px 1fr; gap: var(--space-5); align-items: center; padding: var(--space-3) 0; border-bottom: 1px solid var(--color-outline-variant); }
+  .ds-scale__row:last-child { border: 0; }
+  .ds-scale__row > span:last-child { overflow: hidden; text-overflow: ellipsis; }
+
+  .ds-space { display: grid; grid-template-columns: 32px 1fr 48px; gap: var(--space-3); align-items: center; margin-top: var(--space-2); }
+  .ds-space__bar { height: 10px; border-radius: var(--radius-xs); background: var(--gradient-progress); }
+  .ds-radius, .ds-elev { display: grid; place-items: center; width: 64px; height: 64px; background: var(--color-surface-container-highest); }
+  .ds-elev { border-radius: var(--radius-md); background: var(--color-surface-container-high); }
+
+  .ds-mood { display: grid; gap: var(--space-3); }
+  .ds-mood figcaption { display: grid; }
+  .ds-same { display: grid; grid-template-columns: 160px 220px 1fr 64px; gap: var(--space-5); align-items: start; }
+  .ds-same > div { display: grid; gap: var(--space-3); }
+  .ds-case { margin-bottom: var(--space-2); }
+
+  .ds-reader { max-width: var(--content-max); }
+  .ds-player { max-width: 520px; }
+  .ds-foot { text-align: center; padding: var(--space-8) var(--gutter); border-top: 1px solid var(--color-outline-variant); }
+
+  @media (max-width: 760px) {
+    .ds-top { flex-wrap: wrap; gap: var(--space-3); }
+    .ds-nav { order: 3; flex-basis: 100%; }
+    .ds-hero { grid-template-columns: 1fr; padding: var(--space-6); }
+    .ds-wordmark [lang='ur'] { font-size: 56px; }
+    .ds-same { grid-template-columns: 1fr 1fr; }
+    .ds-scale__row { grid-template-columns: 1fr; gap: var(--space-1); }
+    .ds-aa--display, .ds-aa--body { font-size: 96px; }
+  }
+</style>

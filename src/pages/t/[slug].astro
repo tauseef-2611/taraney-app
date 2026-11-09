@@ -1,0 +1,56 @@
+---
+import App from '../../layouts/App.astro';
+import SongReader from '../../app/SongReader';
+import { Artwork, MetaRow, TaranaCard } from '../../components/ui/content';
+import { composeArtwork } from '../../design/artwork';
+import { allSongs, cardOf, primaryRec, songHref, videoRec, type PubSong } from '../../data/load';
+import { THEMES } from '../../lib/taxonomy';
+
+export function getStaticPaths() {
+  return allSongs().map((song) => ({ params: { slug: song.slug }, props: { song } }));
+}
+const { song } = Astro.props as { song: PubSong };
+const card = cardOf(song);
+const related = allSongs().filter((s) => s.id !== song.id && (s.mood === song.mood || s.genre === song.genre)).slice(0, 5).map(cardOf);
+const firstLine = song.doc.sections[0]?.lines[0];
+const title = `${song.title_ro || song.title_ur} · Taraney`;
+const description = [song.title_ur, firstLine?.ro].filter(Boolean).join(' · ');
+const art = composeArtwork(song.id, song.mood);
+const reader = {
+  id: song.id, slug: song.slug, title_ur: song.title_ur, title_ro: song.title_ro, mood: song.mood, genre: song.genre,
+  doc: song.doc, audio: primaryRec(song), video: videoRec(song),
+};
+const themes = song.themes.filter((t) => THEMES[t]);
+---
+<App title={title} description={description}>
+  <article class="song">
+    <header class="song-head reveal" style={art.style}>
+      <div class="song-head__glow" aria-hidden="true"></div>
+      <Artwork song={card} class="song-head__art" />
+      <div class="song-head__text">
+        {song.title_ro
+          ? <h1 class="song-head__title" lang="ur-Latn">{song.title_ro}</h1>
+          : <h1 class="song-head__title song-head__title--ur" lang="ur">{song.title_ur}</h1>}
+        {song.title_ro && song.title_ur && <p class="song-head__ur" lang="ur">{song.title_ur}</p>}
+        <div class="song-head__meta">
+          <MetaRow song={{ ...card, poet_ro: song.poet_ro }} />
+          {!song.reviewed && <span class="badge">Draft</span>}
+        </div>
+      </div>
+    </header>
+
+    {themes.length > 0 && (
+      <div class="theme-row reveal" style="--i:1">{themes.map((t) => <span class="chip chip--quiet">{THEMES[t].ro}</span>)}</div>
+    )}
+
+    <div class="reveal" style="--i:2"><SongReader client:load song={reader} /></div>
+
+    {related.length > 0 && (
+      <section class="sec">
+        <div class="sec__head"><h2>More like this</h2></div>
+        <div class="rows">{related.map((r, i) => <div class="reveal" style={`--i:${i}`}><TaranaCard song={r} layout="row" href={songHref(r)} /></div>)}</div>
+      </section>
+    )}
+    <a class="btn btn--outlined interactive song__contribute" href={`/submit/?type=audio&song=${song.id}`}>Have a recording of this tarana? Share it</a>
+  </article>
+</App>

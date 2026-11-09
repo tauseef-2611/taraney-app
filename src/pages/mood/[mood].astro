@@ -1,0 +1,22 @@
+---
+import App from '../../layouts/App.astro';
+import { Artwork, TaranaCard } from '../../components/ui/content';
+import { allSongs, cardOf, songHref } from '../../data/load';
+import { MOODS, MOOD_LABELS, type Mood } from '../../lib/mood';
+
+export function getStaticPaths() {
+  return MOODS.filter((m) => allSongs().some((s) => s.mood === m)).map((mood) => ({ params: { mood } }));
+}
+const mood = Astro.params.mood as Mood;
+const list = allSongs().filter((s) => s.mood === mood).map(cardOf);
+const label = MOOD_LABELS[mood];
+---
+<App title={`${label.ro} · Taraney`} tab="explore">
+  <div class="page">
+    <section class="sec">
+      <Artwork song={{ id: `mood-${mood}`, mood, title_ur: label.ur, title_ro: `${label.ro} · ${list.length} taraney` }} variant="wide" showTitle animated />
+      <p class="t-body-lg c-variant">{label.feel}</p>
+    </section>
+    <div class="rows">{list.map((s) => <TaranaCard song={s} layout="row" href={songHref(s)} />)}</div>
+  </div>
+</App>

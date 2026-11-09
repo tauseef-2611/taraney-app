@@ -1,0 +1,5 @@
+# Copy to .dev.vars for local Pages Functions. Never commit .dev.vars.
+# Production: wrangler pages secret put ADMIN_EMAIL / ADMIN_PASSPHRASE
+ADMIN_EMAIL=you@example.com
+# A long generated passphrase (6+ random words). Hashed comparison; long and random is what keeps it safe.
+ADMIN_PASSPHRASE=

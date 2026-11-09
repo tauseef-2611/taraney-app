@@ -1,0 +1,73 @@
+/* Base layer. Uses only token variables from src/design/tokens.ts (inlined by the layout). */
+@import '@fontsource/gulzar/arabic-400.css';
+@import '@fontsource/gulzar/latin-400.css';
+@import '@fontsource-variable/plus-jakarta-sans/wght.css';
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--gradient-shell);
+  background-attachment: fixed;
+  color: var(--color-on-bg);
+  font: var(--type-body-lg);
+  letter-spacing: var(--track-body-lg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+img, svg, video { display: block; max-width: 100%; }
+button, input, select, textarea { font: inherit; color: inherit; }
+a { color: inherit; text-decoration: none; }
+h1, h2, h3, h4, p, figure { margin: 0; }
+
+[lang='ur'] { font-family: var(--font-urdu); direction: rtl; unicode-bidi: isolate; }
+[lang='ur-Latn'] { direction: ltr; unicode-bidi: isolate; }
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+::selection { background: color-mix(in oklab, var(--color-primary) 35%, transparent); }
+
+.visually-hidden {
+  position: absolute !important; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap;
+}
+
+/* Type utilities, one per type token */
+.t-display-lg { font: var(--type-display-lg); letter-spacing: var(--track-display-lg); }
+.t-display-md { font: var(--type-display-md); letter-spacing: var(--track-display-md); }
+.t-headline-lg { font: var(--type-headline-lg); }
+.t-headline-md { font: var(--type-headline-md); }
+.t-headline-sm { font: var(--type-headline-sm); }
+.t-title-lg { font: var(--type-title-lg); }
+.t-title-md { font: var(--type-title-md); letter-spacing: var(--track-title-md); }
+.t-title-sm { font: var(--type-title-sm); letter-spacing: var(--track-title-sm); }
+.t-body-lg { font: var(--type-body-lg); }
+.t-body-md { font: var(--type-body-md); letter-spacing: var(--track-body-md); }
+.t-body-sm { font: var(--type-body-sm); letter-spacing: var(--track-body-sm); }
+.t-label-lg { font: var(--type-label-lg); letter-spacing: var(--track-label-lg); }
+.t-label-md { font: var(--type-label-md); letter-spacing: var(--track-label-md); }
+.t-label-sm { font: var(--type-label-sm); letter-spacing: var(--track-label-sm); text-transform: uppercase; }
+.t-title-ur { font: var(--type-title-ur); }
+.t-lyric-ur { font: var(--type-lyric-ur); }
+.t-lyric-ur-sm { font: var(--type-lyric-ur-sm); }
+.t-lyric-ro { font: var(--type-lyric-ro); letter-spacing: var(--track-lyric-ro); }
+.c-variant { color: var(--color-on-surface-variant); }
+.c-muted { color: var(--color-on-surface-muted); }
+.c-primary { color: var(--color-accent); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+[data-motion='reduced'] *, [data-motion='reduced'] *::before, [data-motion='reduced'] *::after {
+  animation: none !important;
+  transition-duration: 0.001ms !important;
+}

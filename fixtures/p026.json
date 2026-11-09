@@ -1,0 +1,55 @@
+{
+  "id": "p026",
+  "pdf_pages": [26, 27],
+  "status": "public",
+  "review_reason": null,
+  "title_ur": "عزمِ محکم عطا کر خدایا حوصلوں کو نئی زندگی دے",
+  "title_ro": "Azm-e mohkam ata kar khudaya hauslon ko nayi zindagi de",
+  "genre": "dua",
+  "themes": ["tawakkul", "himmat"],
+  "language": "ur",
+  "poet": { "name_ur": null, "name_ro": null, "source": null },
+  "sio_specific": false,
+  "sections": [
+    { "id": "r1", "type": "refrain", "layout": "couplet", "lines": [
+      { "ur": "عزمِ محکم عطا کر خدایا", "ro": "Azm-e mohkam ata kar khudaya" },
+      { "ur": "حوصلوں کو نئی زندگی دے", "ro": "Hauslon ko nayi zindagi de" },
+      { "ur": "سر اٹھائے ہیں ہر سو اندھیرے", "ro": "Sar uthaye hain har su andhere" },
+      { "ur": "شب چراغوں کو اب روشنی دے", "ro": "Shab charaghon ko ab roshni de" }
+    ] },
+    { "id": "v1", "type": "verse", "layout": "single", "lines": [
+      { "ur": "ائے خدا جو بھی ہے سب تیرا ہے", "ro": "Ae khuda jo bhi hai sab tera hai" },
+      { "ur": "ساری قدرت بھی عظمت بھی تیری", "ro": "Saari qudrat bhi azmat bhi teri" },
+      { "ur": "جان و ایماں بھی دنیا بھی تیری", "ro": "Jaan o imaan bhi duniya bhi teri" },
+      { "ur": "موت بھی تیری رحمت بھی تیری", "ro": "Maut bhi teri rehmat bhi teri" },
+      { "ur": "اپنا کچھ بھی نہیں بس دُعا ہے", "ro": "Apna kuch bhi nahin bas dua hai" },
+      { "ur": "تجھ پہ مٹ جائیں وہ زِندگی دے", "ro": "Tujh pe mit jayen woh zindagi de" }
+    ] },
+    { "id": "v2", "type": "verse", "layout": "single", "lines": [
+      { "ur": "تو جو چاہے تو ائے میرے آقا", "ro": "Tu jo chahe to ae mere aaqa" },
+      { "ur": "ڈوبے جگ سارا کشتی بچے گی", "ro": "Doobe jag saara kashti bache gi" },
+      { "ur": "آگ میں پھول کھلتے رہیں گے", "ro": "Aag mein phool khilte rahen ge" },
+      { "ur": "راہ دریا بناتی رہے گی", "ro": "Raah darya banati rahe gi" },
+      { "ur": "تیری قدرت میں کیا کچھ نہیں ہے", "ro": "Teri qudrat mein kya kuch nahin hai" },
+      { "ur": "بس ہمیں جزبۂ بندگی دے", "ro": "Bas hamein jazba-e bandagi de" }
+    ] },
+    { "id": "v3", "type": "verse", "layout": "single", "lines": [
+      { "ur": "بدر کی کامرانی میں تو ہے", "ro": "Badr ki kamrani mein tu hai" },
+      { "ur": "تو ہی خیبر میں عظمت کی دھارا", "ro": "Tu hi Khaibar mein azmat ki dhara" },
+      { "ur": "حق و باطل کے ہر معرکے میں", "ro": "Haq o baatil ke har marke mein" },
+      { "ur": "تو رہا غازیوں کا سہارا", "ro": "Tu raha ghaziyon ka sahara" },
+      { "ur": "آج بھی ہر طرف کربلا ہے", "ro": "Aaj bhi har taraf Karbala hai" },
+      { "ur": "ہم کو شبیر سی تشنگی دے", "ro": "Hum ko Shabbir si tashnagi de" }
+    ] },
+    { "id": "v4", "type": "verse", "layout": "single", "lines": [
+      { "ur": "علم بھی دے شعورِ عمل بھی", "ro": "Ilm bhi de shuoor-e amal bhi" },
+      { "ur": "سچ کو پہچان لے وہ نظر دے", "ro": "Sach ko pehchan le woh nazar de" },
+      { "ur": "رشک پرواز پر ہو جہاں کو", "ro": "Rashk parwaz par ho jahan ko" },
+      { "ur": "یا خدا ہم کو وہ بال و پر دے", "ro": "Ya khuda hum ko woh baal o par de" },
+      { "ur": "لاج رکھ لے دُعاء کی تو رکھ لے", "ro": "Laaj rakh le dua ki tu rakh le" },
+      { "ur": "موت بے بس ہو وہ زندگی دے", "ro": "Maut be bas ho woh zindagi de" }
+    ] }
+  ],
+  "structure": ["r1", "v1", "r1", "v2", "r1", "v3", "r1", "v4", "r1"],
+  "notes": ["v2[5]: print جزبۂ, read as jazba-e"]
+}

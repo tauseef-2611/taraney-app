@@ -1,0 +1,20 @@
+---
+import App from '../layouts/App.astro';
+import Explore from '../app/Explore';
+import { allSongs } from '../data/load';
+import { MOODS, MOOD_LABELS } from '../lib/mood';
+import { GENRES } from '../lib/taxonomy';
+
+const songs = allSongs();
+const genres = Object.keys(GENRES).map((key) => ({ key, count: songs.filter((s) => s.genre === key).length })).filter((g) => g.count > 0);
+const moods = MOODS.map((m) => ({ key: m, ur: MOOD_LABELS[m].ur, ro: MOOD_LABELS[m].ro, count: songs.filter((s) => s.mood === m).length })).filter((x) => x.count > 0);
+---
+<App title="Explore · Taraney" tab="explore">
+  <div class="page page--tight">
+    <header class="page-title reveal">
+      <h1>Explore</h1>
+      <p>{songs.length} taraney · search in Urdu or Roman</p>
+    </header>
+    <Explore client:load genres={genres} moods={moods} />
+  </div>
+</App>

@@ -1,0 +1,50 @@
+# Ingests one YouTube recording: yt-dlp audio -> ffmpeg normalise -> R2 -> Gemini lyrics (if missing)
+# and draft line timings -> D1. Started from the admin ("Fetch audio from YouTube").
+name: Ingest
+
+on:
+  workflow_dispatch:
+    inputs:
+      recording_id:
+        description: Recording id (rec-...)
+        required: true
+      job_id:
+        description: Job id created by the admin (optional)
+        required: false
+        default: ''
+      timing:
+        description: Draft line timings with Gemini
+        type: boolean
+        default: true
+
+concurrency:
+  group: ingest
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
+      PYTHON: python3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --upgrade yt-dlp
+      - run: npm ci
+      - name: Ingest
+        run: >
+          node --no-warnings --experimental-strip-types scripts/ingest.ts
+          --recording "${{ inputs.recording_id }}"
+          ${{ inputs.job_id != '' && format('--job {0}', inputs.job_id) || '' }}
+          ${{ inputs.timing == false && '--no-timing' || '' }}

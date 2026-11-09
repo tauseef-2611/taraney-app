@@ -1,0 +1,21 @@
+---
+import App from '../../layouts/App.astro';
+import { TaranaCard } from '../../components/ui/content';
+import { allSongs, cardOf, songHref } from '../../data/load';
+import { GENRES } from '../../lib/taxonomy';
+
+export function getStaticPaths() {
+  return Object.keys(GENRES).filter((g) => allSongs().some((s) => s.genre === g)).map((genre) => ({ params: { genre } }));
+}
+const genre = Astro.params.genre as string;
+const list = allSongs().filter((s) => s.genre === genre).map(cardOf);
+---
+<App title={`${GENRES[genre].ro} · Taraney`} tab="explore">
+  <div class="page">
+    <header class="sec">
+      <p class="t-headline-lg" lang="ur" style="text-align:left; color: var(--color-accent)">{GENRES[genre].ur}</p>
+      <h1 class="t-headline-md">{GENRES[genre].ro} <span class="t-body-md c-muted">· {list.length}</span></h1>
+    </header>
+    <div class="rows">{list.map((s) => <TaranaCard song={s} layout="row" href={songHref(s)} />)}</div>
+  </div>
+</App>

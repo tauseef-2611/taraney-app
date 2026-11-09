@@ -1,0 +1,49 @@
+# Cloudflare Pages project. Local dev uses emulated D1/R2 in .wrangler/state.
+# Production: create the resources once, then paste the real database_id below.
+#   npx wrangler d1 create taraney-db
+#   npx wrangler r2 bucket create taraney-media
+#   npx wrangler r2 bucket create taraney-private
+name = "taraney"
+pages_build_output_dir = "./dist"
+compatibility_date = "2026-10-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+APP_ENV = "local"
+SITE_NOINDEX = "1"
+ALLOWED_ORIGINS = "http://localhost:4321,http://127.0.0.1:4321,http://localhost:8788"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "taraney-db"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "taraney-media"
+
+[[r2_buckets]]
+binding = "PRIVATE"
+bucket_name = "taraney-private"
+
+# Production. Pages does NOT inherit bindings into an environment, so they are repeated here.
+# Use the SAME database_id as above (paste it in both places).
+[env.production.vars]
+APP_ENV = "production"
+SITE_NOINDEX = "1"
+ALLOWED_ORIGINS = ""
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "taraney-db"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+[[env.production.r2_buckets]]
+binding = "MEDIA"
+bucket_name = "taraney-media"
+
+[[env.production.r2_buckets]]
+binding = "PRIVATE"
+bucket_name = "taraney-private"

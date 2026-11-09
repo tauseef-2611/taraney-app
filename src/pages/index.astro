@@ -1,0 +1,74 @@
+---
+import App from '../layouts/App.astro';
+import { Artwork, TaranaCard } from '../components/ui/content';
+import { Icon } from '../components/ui/Icon';
+import HeroCarousel from '../app/HeroCarousel';
+import CoupletOfDay, { type Couplet } from '../app/CoupletOfDay';
+import ContinueRow from '../app/ContinueRow';
+import { allSongs, cardOf, songHref } from '../data/load';
+import { MOODS, MOOD_LABELS } from '../lib/mood';
+import { GENRES } from '../lib/taxonomy';
+
+const songs = allSongs();
+const cards = songs.map((s) => ({ ...cardOf(s) }));
+const pool = [...cards.filter((c) => c.has_audio), ...cards.filter((c) => !c.has_audio && c.title_ur)].slice(0, 40);
+const recent = cards.slice(0, 8);
+const withAudio = cards.filter((c) => c.has_audio).slice(0, 6);
+const moods = MOODS.map((m) => ({ m, n: songs.filter((s) => s.mood === m).length })).filter((x) => x.n > 0).sort((a, b) => b.n - a.n);
+const genres = Object.keys(GENRES).map((g) => ({ g, n: songs.filter((s) => s.genre === g).length })).filter((x) => x.n >= 3);
+
+const couplets: Couplet[] = songs.flatMap((s) => {
+  const sec = s.doc.sections.find((x) => x.lines.length >= 2 && x.lines[0].ur && x.lines[0].ro);
+  if (!sec) return [];
+  return [{ id: s.id, slug: s.slug, mood: s.mood, title_ur: s.title_ur, title_ro: s.title_ro, lines: sec.lines.slice(0, 2).map((l) => ({ ur: l.ur || '', ro: l.ro || '' })) }];
+}).slice(0, 60);
+---
+<App title="Taraney · ترانے" description="Read, listen and sing along to Urdu taraney." tab="home">
+  <div class="page">
+    <HeroCarousel client:load pool={pool} />
+
+    <form action="/explore/" class="search reveal" role="search" style="--i:1">
+      <Icon name="search" />
+      <input type="search" name="q" placeholder="Search a title or a line you remember" aria-label="Search taraney" />
+    </form>
+
+    <ContinueRow client:load />
+
+    <section class="sec">
+      <div class="sec__head"><h2>Moods</h2><a class="sec__more" href="/explore/">Explore</a></div>
+      <div class="mood-grid">
+        {moods.map(({ m, n }, i) => (
+          <a class="mood-tile interactive reveal" style={`--i:${i}`} href={`/mood/${m}/`}>
+            <Artwork song={{ id: `mood-${m}`, mood: m }} animated={i === 0} />
+            <span class="mood-tile__label">
+              <span lang="ur">{MOOD_LABELS[m].ur}</span>
+              <small>{MOOD_LABELS[m].ro} · {n}</small>
+              {i === 0 && <em>{MOOD_LABELS[m].feel}</em>}
+            </span>
+          </a>
+        ))}
+      </div>
+    </section>
+
+    {withAudio.length > 0 && (
+      <section class="sec">
+        <div class="sec__head"><h2>Listen with lyrics</h2></div>
+        <div class="rows">{withAudio.map((s, i) => <div class="reveal" style={`--i:${i}`}><TaranaCard song={s} layout="row" href={songHref(s)} /></div>)}</div>
+      </section>
+    )}
+
+    <section class="sec">
+      <div class="sec__head"><h2>Recently added</h2><a class="sec__more" href="/explore/">See all</a></div>
+      <div class="rows">{recent.map((s, i) => <div class="reveal" style={`--i:${i}`}><TaranaCard song={s} layout="row" href={songHref(s)} /></div>)}</div>
+    </section>
+
+    <section class="sec">
+      <div class="sec__head"><h2>Browse by kind</h2></div>
+      <div class="chip-row">{genres.map(({ g, n }) => <a class="chip interactive" href={`/genre/${g}/`}>{GENRES[g].ro} · {n}</a>)}</div>
+    </section>
+
+    {couplets.length > 0 && <CoupletOfDay client:visible candidates={couplets} />}
+
+    <a class="btn btn--outlined interactive" style="justify-self:center" href="/submit/"><Icon name="edit" />Know a tarana we don’t have? Suggest it</a>
+  </div>
+</App>

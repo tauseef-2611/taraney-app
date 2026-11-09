@@ -1,0 +1,8 @@
+---
+import Base from '../layouts/Base.astro';
+import AdminApp from '../admin/App';
+import '../styles/admin.css';
+---
+<Base title="Taraney · Admin" description="Taraney admin">
+  <AdminApp client:only="preact" />
+</Base>

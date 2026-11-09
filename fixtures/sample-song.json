@@ -1,0 +1,428 @@
+{
+ "id": "up-3be63c7c72",
+ "slug": "hum-duniya-par-chha-jayen-ge",
+ "title_ur": "ہم دنیا پر چھا جائیں گے",
+ "title_ro": "Hum Duniya Par Chha Jayen Ge",
+ "genre": "tarana",
+ "themes": [
+  "bedari",
+  "naujawan",
+  "himmat",
+  "dawat"
+ ],
+ "poet_ur": "ابوبکر فلاحی",
+ "poet_ro": "Abubakar Falahi",
+ "doc": {
+  "sections": [
+   {
+    "id": "v0",
+    "type": "verse",
+    "layout": "couplet",
+    "lines": [
+     {
+      "ur": "سبق پھر پڑھ صداقت کا عدالت کا شجاعت کا",
+      "ro": "Sabaq phir parh sadaqat ka adalat ka shujaat ka"
+     },
+     {
+      "ur": "لیا جائے گا تجھ سے کام دنیا کی امامت کا",
+      "ro": "Liya jaye ga tujh se kaam duniya ki imamat ka"
+     }
+    ]
+   },
+   {
+    "id": "r1",
+    "type": "refrain",
+    "layout": "single",
+    "lines": [
+     {
+      "ur": "ہم دنیا پر چھا جائیں گے انشاء اللہ رحمت بن کر",
+      "ro": "Hum duniya par chha jayen ge Insha Allah rahmat ban kar"
+     },
+     {
+      "ur": "ظلمت کو کریں گے زیر و زبر کر لیں گے مسخر بحر و بر",
+      "ro": "Zulmat ko karen ge zer o zabar kar lain ge musakhhar bahr o bar"
+     },
+     {
+      "ur": "اللہ ہمارا رب ہے اور جھکتا ہے اسی کے آگے سر",
+      "ro": "Allah hamara Rabb hai aur jhukta hai usi ke aage sar"
+     },
+     {
+      "ur": "وہ احمد مرسل ختم رسل ہیں اپنے ہادی اور رہبر",
+      "ro": "Woh Ahmad-e Mursal Khatm-e rusul hain apne haadi aur rahbar"
+     },
+     {
+      "ur": "ہم دنیا پر چھا جائیں گے انشاء اللہ رحمت بن کر",
+      "ro": "Hum duniya par chha jayen ge Insha Allah rahmat ban kar"
+     }
+    ]
+   },
+   {
+    "id": "v1",
+    "type": "verse",
+    "layout": "single",
+    "lines": [
+     {
+      "ur": "ہم امت مسلم کے ہیں جواں جذبے ہے جواں اور دل بھی جواں",
+      "ro": "Hum Ummat-e Muslim ke hain jawan jazbe hain jawan aur dil bhi jawan"
+     },
+     {
+      "ur": "پروازِ بلند میں ہم شاہیں رفتارِ سُبک میں سیلِ رواں",
+      "ro": "Parwaz-e buland mein hum shaheen raftaar-e subuk mein sail-e rawan"
+     },
+     {
+      "ur": "اسلام کے مخلص داعی ہیں دل نرم بہت شیریں ہے زباں",
+      "ro": "Islam ke mukhlis daee hain dil narm bahut shireen hai zaban"
+     },
+     {
+      "ur": "اللہ کا ڈر سینوں میں ہے نہاں دستور ہمارا ہے قرآں",
+      "ro": "Allah ka dar seenon mein hai nahan dastoor hamara hai Quran"
+     },
+     {
+      "ur": "پر عزم ہیں ہم پر عزم ہیں ہم روشن ہے ہماری راہ گزر",
+      "ro": "Pur azm hain hum Pur azm hain hum roshan hai hamari rah guzar"
+     }
+    ]
+   },
+   {
+    "id": "v2",
+    "type": "verse",
+    "layout": "single",
+    "lines": [
+     {
+      "ur": "دنیا کی قیادت بارِ گراں اس بارِ گراں کو اٹھائیں گے",
+      "ro": "Duniya ki qiyadat baar-e giran is baar-e giran ko uthayen ge"
+     },
+     {
+      "ur": "اوصافِ حمیدہ کے حامل بن کر سب کو دکھائیں گے",
+      "ro": "Osaaf-e hameeda ke hamil ban kar sab ko dikhlayen ge"
+     },
+     {
+      "ur": "روشن کر دیں گے فکر و نظر ذہنوں میں بلندی لائیں گے",
+      "ro": "Roshan kar den ge fikr o nazar zehnon mein bulandi layen ge"
+     },
+     {
+      "ur": "گفتارِ حسیں اپنائیں گے کردارِ حسیں اپنائیں گے",
+      "ro": "Guftaar-e haseen apnayen ge kirdaar-e haseen apnayen ge"
+     },
+     {
+      "ur": "دیتے ہیں ہم کو زادِ سفر عثمان و علی بوبکر و عمر",
+      "ro": "Dete hain hum ko zad-e safar Usman o Ali Abu-Bakr o Umar"
+     }
+    ]
+   },
+   {
+    "id": "v3",
+    "type": "verse",
+    "layout": "single",
+    "lines": [
+     {
+      "ur": "ہم عدل و امانت کے خوگر ہم اہلِ صفا معمارِ جہاں",
+      "ro": "Hum adl o amanat ke khoogar hum ahl-e safa memaar-e jahan"
+     },
+     {
+      "ur": "روکیں گے فسادِ بحر و بر پھیلائیں گے ہر سو امن و اماں",
+      "ro": "Roken ge fasaad-e bahr o bar phailayen ge har soo amn o aman"
+     },
+     {
+      "ur": "دنیا کو بنائیں گے گلشن انساں کو بنائیں گے انساں",
+      "ro": "Duniya ko banayen ge gulshan insan ko banayen ge insan"
+     },
+     {
+      "ur": "بس دل میں ہمارے ایک لگن بن جائے گلستاں سارا جہاں",
+      "ro": "Bas dil mein hamare ek lagan ban jaye gulistan saara jahan"
+     },
+     {
+      "ur": "واللہ کبھی بیٹھیں گے نہیں جب تک پورا کر لیں نہ سفر",
+      "ro": "Wallah kabhi baithen ge nahin jab tak poora kar lain na safar"
+     }
+    ]
+   }
+  ],
+  "structure": [
+   "v0",
+   "r1",
+   "v1",
+   "r1",
+   "v2",
+   "r1",
+   "v3",
+   "r1"
+  ],
+  "notes": [
+   "v0: Audio includes introductory couplet by Allama Iqbal not present in printed text.",
+   "v1[0]: print ہے, sung as ہیں.",
+   "v2[4]: print بوبکر, sung as Abu-Bakr.",
+   "timing: some Gemini line times were missing or out of order and were repaired; check them in the timing studio"
+  ]
+ },
+ "recording": {
+  "id": "rec-7d18b90a1a10",
+  "kind": "audio",
+  "audio_url": "/samples/hum-duniya.m4a",
+  "label": "Sample recording",
+  "duration_ms": 336600,
+  "sync_level": 1,
+  "timing_source": "tap",
+  "lines": [
+   {
+    "occ": 0,
+    "section": "v0",
+    "line": 0,
+    "start_ms": 58441,
+    "end_ms": 61391
+   },
+   {
+    "occ": 0,
+    "section": "v0",
+    "line": 1,
+    "start_ms": 61391,
+    "end_ms": 61657
+   },
+   {
+    "occ": 1,
+    "section": "r1",
+    "line": 0,
+    "start_ms": 61657,
+    "end_ms": 62829
+   },
+   {
+    "occ": 1,
+    "section": "r1",
+    "line": 1,
+    "start_ms": 62829,
+    "end_ms": 63116
+   },
+   {
+    "occ": 1,
+    "section": "r1",
+    "line": 2,
+    "start_ms": 63116,
+    "end_ms": 63609
+   },
+   {
+    "occ": 1,
+    "section": "r1",
+    "line": 3,
+    "start_ms": 63609,
+    "end_ms": 65119
+   },
+   {
+    "occ": 1,
+    "section": "r1",
+    "line": 4,
+    "start_ms": 65119,
+    "end_ms": 67205
+   },
+   {
+    "occ": 2,
+    "section": "v1",
+    "line": 0,
+    "start_ms": 67205,
+    "end_ms": 75913
+   },
+   {
+    "occ": 2,
+    "section": "v1",
+    "line": 1,
+    "start_ms": 75913,
+    "end_ms": 115000
+   },
+   {
+    "occ": 2,
+    "section": "v1",
+    "line": 2,
+    "start_ms": 115000,
+    "end_ms": 123000
+   },
+   {
+    "occ": 2,
+    "section": "v1",
+    "line": 3,
+    "start_ms": 123000,
+    "end_ms": 129000
+   },
+   {
+    "occ": 2,
+    "section": "v1",
+    "line": 4,
+    "start_ms": 129000,
+    "end_ms": 137000
+   },
+   {
+    "occ": 3,
+    "section": "r1",
+    "line": 0,
+    "start_ms": 137000,
+    "end_ms": 145000
+   },
+   {
+    "occ": 3,
+    "section": "r1",
+    "line": 1,
+    "start_ms": 145000,
+    "end_ms": 153000
+   },
+   {
+    "occ": 3,
+    "section": "r1",
+    "line": 2,
+    "start_ms": 153000,
+    "end_ms": 161000
+   },
+   {
+    "occ": 3,
+    "section": "r1",
+    "line": 3,
+    "start_ms": 161000,
+    "end_ms": 169000
+   },
+   {
+    "occ": 3,
+    "section": "r1",
+    "line": 4,
+    "start_ms": 169000,
+    "end_ms": 170000
+   },
+   {
+    "occ": 4,
+    "section": "v2",
+    "line": 0,
+    "start_ms": 170000,
+    "end_ms": 171000
+   },
+   {
+    "occ": 4,
+    "section": "v2",
+    "line": 1,
+    "start_ms": 171000,
+    "end_ms": 172000
+   },
+   {
+    "occ": 4,
+    "section": "v2",
+    "line": 2,
+    "start_ms": 172000,
+    "end_ms": 173000
+   },
+   {
+    "occ": 4,
+    "section": "v2",
+    "line": 3,
+    "start_ms": 173000,
+    "end_ms": 174000
+   },
+   {
+    "occ": 4,
+    "section": "v2",
+    "line": 4,
+    "start_ms": 174000,
+    "end_ms": 182000
+   },
+   {
+    "occ": 5,
+    "section": "r1",
+    "line": 0,
+    "start_ms": 182000,
+    "end_ms": 190000
+   },
+   {
+    "occ": 5,
+    "section": "r1",
+    "line": 1,
+    "start_ms": 190000,
+    "end_ms": 198000
+   },
+   {
+    "occ": 5,
+    "section": "r1",
+    "line": 2,
+    "start_ms": 198000,
+    "end_ms": 206000
+   },
+   {
+    "occ": 5,
+    "section": "r1",
+    "line": 3,
+    "start_ms": 206000,
+    "end_ms": 214000
+   },
+   {
+    "occ": 5,
+    "section": "r1",
+    "line": 4,
+    "start_ms": 214000,
+    "end_ms": 231000
+   },
+   {
+    "occ": 6,
+    "section": "v3",
+    "line": 0,
+    "start_ms": 231000,
+    "end_ms": 239000
+   },
+   {
+    "occ": 6,
+    "section": "v3",
+    "line": 1,
+    "start_ms": 239000,
+    "end_ms": 247000
+   },
+   {
+    "occ": 6,
+    "section": "v3",
+    "line": 2,
+    "start_ms": 247000,
+    "end_ms": 263000
+   },
+   {
+    "occ": 6,
+    "section": "v3",
+    "line": 3,
+    "start_ms": 263000,
+    "end_ms": 271000
+   },
+   {
+    "occ": 6,
+    "section": "v3",
+    "line": 4,
+    "start_ms": 271000,
+    "end_ms": 279000
+   },
+   {
+    "occ": 7,
+    "section": "r1",
+    "line": 0,
+    "start_ms": 279000,
+    "end_ms": 287000
+   },
+   {
+    "occ": 7,
+    "section": "r1",
+    "line": 1,
+    "start_ms": 287000,
+    "end_ms": 295000
+   },
+   {
+    "occ": 7,
+    "section": "r1",
+    "line": 2,
+    "start_ms": 295000,
+    "end_ms": 303000
+   },
+   {
+    "occ": 7,
+    "section": "r1",
+    "line": 3,
+    "start_ms": 303000,
+    "end_ms": 311000
+   },
+   {
+    "occ": 7,
+    "section": "r1",
+    "line": 4,
+    "start_ms": 311000,
+    "end_ms": 325000
+   }
+  ]
+ }
+}

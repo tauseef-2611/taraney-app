@@ -1,0 +1,15 @@
+---
+import App from '../layouts/App.astro';
+import SubmitForm from '../app/SubmitForm';
+import { allSongs } from '../data/load';
+const songs = allSongs().map((s) => ({ id: s.id, title: s.title_ro || s.title_ur || s.id })).sort((a, b) => a.title.localeCompare(b.title));
+---
+<App title="Suggest a tarana · Taraney">
+  <div class="page" style="max-width: var(--content-max); margin: 0 auto;">
+    <header class="sec">
+      <h1 class="t-headline-md">Suggest a tarana</h1>
+      <p class="t-body-lg c-variant">Send lyrics, a YouTube link or a recording. An editor checks every submission before anything is published.</p>
+    </header>
+    <SubmitForm client:load songs={songs} />
+  </div>
+</App>

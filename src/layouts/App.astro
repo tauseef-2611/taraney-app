@@ -1,0 +1,49 @@
+---
+// Reader app shell: header, content, persistent mini-player, bottom tab bar (top nav on desktop).
+import { ClientRouter } from 'astro:transitions';
+import Base from './Base.astro';
+import MiniPlayer from '../app/MiniPlayer';
+import ThemeSwitchCompact from '../app/ThemeToggle';
+import { Icon } from '../components/ui/Icon';
+import '../styles/app.css';
+
+interface Props { title: string; description?: string; tab?: 'home' | 'explore' | 'library' | ''; ogImage?: string }
+const { title, description, tab = '', ogImage } = Astro.props;
+const tabs = [
+  { key: 'home', label: 'Home', icon: 'home', href: '/' },
+  { key: 'explore', label: 'Explore', icon: 'explore', href: '/explore/' },
+  { key: 'library', label: 'Library', icon: 'library', href: '/library/' },
+] as const;
+---
+<Base title={title} description={description} ogImage={ogImage}>
+  <ClientRouter slot="head" />
+  <header class="app-top">
+    <a href="/" class="app-brand"><span lang="ur">ترانے</span><span>Taraney</span></a>
+    <nav class="app-nav" aria-label="Main">
+      {tabs.map((t) => <a href={t.href} class="app-nav__link interactive" aria-current={tab === t.key ? 'page' : undefined}>{t.label}</a>)}
+    </nav>
+    <div class="app-top__tools">
+      <a class="icon-btn interactive" href="/explore/#search" aria-label="Search"><Icon name="search" /></a>
+      <ThemeSwitchCompact client:idle transition:persist="theme" />
+    </div>
+  </header>
+
+  <main id="main" class="app-main"><slot /></main>
+
+  <MiniPlayer client:load transition:persist="mini-player" />
+
+  <nav class="app-tabs tabbar" aria-label="Main">
+    {tabs.map((t) => (
+      <a href={t.href} class="tab interactive" aria-current={tab === t.key ? 'page' : undefined}>
+        <span class="tab__icon"><Icon name={t.icon} /></span>
+        <span class="tab__label">{t.label}</span>
+      </a>
+    ))}
+  </nav>
+
+  <script is:inline>
+    if ('serviceWorker' in navigator && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+      navigator.serviceWorker.register('/sw.js').catch(function () {});
+    }
+  </script>
+</Base>

@@ -1,0 +1,38 @@
+---
+import { tokensCss } from '../design/tokens';
+import '../styles/base.css';
+import '../styles/components.css';
+
+interface Props { title: string; description?: string; canonical?: string; ogImage?: string }
+const { title, description = 'Taraney: read and listen to Urdu taraney.', canonical, ogImage } = Astro.props;
+const css = tokensCss();
+---
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex" />
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#0D1517" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    {ogImage && <meta property="og:image" content={ogImage} />}
+    {canonical && <link rel="canonical" href={canonical} />}
+    <title>{title}</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <Fragment set:html={`<style id="tokens">${css}</style>`} />
+    <script is:inline>
+      (function () {
+        function apply() { try { var t = localStorage.getItem('taraney_theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {} }
+        apply();
+        if (!window.__taraneyTheme) { window.__taraneyTheme = 1; document.addEventListener('astro:after-swap', apply); }
+      })();
+    </script>
+    <slot name="head" />
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>
