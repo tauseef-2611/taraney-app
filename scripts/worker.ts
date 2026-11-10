@@ -295,10 +295,9 @@ async function runAsOrchestrator() {
     ];
 
     if (IS_WIN) {
-      // Open a new conhost cmd window that keeps open after the process finishes
-      spawnSync('cmd', ['/c', 'start', `"Taraney Worker ${i}"`, 'cmd', '/k',
-        `"${node}" ${args.join(' ')}`,
-      ], { shell: false, detached: true });
+      // Quote paths to handle spaces safely, and execute via cmd /c
+      const cmdLine = `start "Taraney Worker ${i}" cmd /k ""${node}" ${args.map(a => `"${a}"`).join(' ')}"`;
+      spawnSync('cmd.exe', ['/c', cmdLine], { windowsVerbatimArguments: true });
     } else if (process.platform === 'darwin') {
       // macOS Terminal.app
       const cmd = `"${node}" ${args.map((a) => `'${a}'`).join(' ')}`;

@@ -11,6 +11,7 @@ interface Stats {
 
 export default function Dashboard() {
   const [s, setS] = useState<Stats | null>(null);
+  const [publishing, setPublishing] = useState(false);
   useEffect(() => { api.get<Stats>('/admin/stats').then(setS); }, []);
   if (!s) return <div class="admin-loading">Loading…</div>;
   const total = Object.values(s.songs).reduce((a, b) => a + b, 0);
@@ -34,9 +35,19 @@ export default function Dashboard() {
           <a class="btn btn--secondary interactive" href="#/queue">
             <Icon name="download" />Job Queue{s.queued_jobs > 0 && <span class="admin__count">{s.queued_jobs}</span>}
           </a>
-          <button class="btn btn--secondary interactive" onClick={() => {
-            alert('To publish the site, run this in your terminal:\n\n  npm run deploy\n\nThis builds and deploys to Cloudflare Pages.');
-          }}><Icon name="share" />Publish site</button>
+          <button class="btn btn--secondary interactive" disabled={publishing} onClick={async () => {
+            setPublishing(true);
+            try {
+              const result = await api.post<{ site?: string; note?: string }>('/admin/publish');
+              alert(result.site === 'rebuilding'
+                ? 'Publish started in GitHub Actions. The public site will update in about 2 minutes.'
+                : result.note || 'GitHub Actions publishing is not configured.');
+            } catch (e) {
+              alert((e as Error).message);
+            } finally {
+              setPublishing(false);
+            }
+          }}><Icon name="share" />{publishing ? 'Starting…' : 'Publish site'}</button>
           <a class="btn btn--primary interactive" href="#/new"><Icon name="edit" />New tarana</a>
         </div>
       </header>

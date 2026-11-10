@@ -149,6 +149,13 @@ p.diff__new { padding: var(--space-3) var(--space-4); border-radius: var(--radiu
 .data-table tr.row--active td { background: color-mix(in oklab, var(--color-primary) 6%, transparent); }
 .c-error { color: var(--color-error); }
 
+.section-edit--warning { box-shadow: inset 3px 0 0 var(--color-error); }
+.input--warning { border-color: var(--color-error); background: color-mix(in oklab, var(--color-error) 6%, var(--color-surface)); }
+.lyrics-diagnostics { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); margin-top: var(--space-3); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); background: var(--color-error-container); color: var(--color-on-error-container); font: var(--type-body-sm); }
+.lyrics-diagnostics__item { display: inline-block; }
+.lyrics-summary { max-width: 28rem; }
+.lyrics-summary summary { cursor: pointer; }
+
 @media (max-width: 860px) {
   .admin { grid-template-columns: 1fr; }
   .admin__nav { position: sticky; top: 0; z-index: 10; height: auto; flex-direction: row; align-items: center; padding: var(--space-3) var(--space-4); overflow-x: auto; border-inline-end: 0; border-bottom: 1px solid var(--color-outline-variant); }

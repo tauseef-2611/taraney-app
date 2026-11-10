@@ -65,17 +65,17 @@ function Details({ song, reload }: { song: FullSong; reload: () => void }) {
   const save = async () => {
     setBusy(true);
     try {
-      await api.put(`/admin/songs/${song.id}`, {
+      const result = await api.put<{ site?: string; note?: string }>(`/admin/songs/${song.id}`, {
         title_ro: f.title_ro, title_ur: f.title_ur, genre: f.genre, themes: f.themes, mood: f.mood, mood_locked: f.mood_locked,
         poet_ro: f.poet_ro, poet_ur: f.poet_ur, singer: f.singer, reviewed: f.reviewed,
       });
-      toast('Saved'); reload();
+      toast(result.site === 'rebuilding' ? 'Saved. GitHub Actions is rebuilding the public site.' : 'Saved'); reload();
     } catch (x) { toast((x as Error).message, 'err'); } finally { setBusy(false); }
   };
   const setState = async (state: string) => {
     if (state === 'published' && song.issues.length && !confirm(`This tarana has ${song.issues.length} issue(s). Publish anyway?`)) return;
     const r = await api.post<{ site?: string; note?: string }>(`/admin/songs/${song.id}/state`, { state });
-    if (r.site === 'rebuilding') toast(`Now ${STATE_LABEL[state].toLowerCase()}. The public site updates in about 2 minutes.`);
+    if (r.site === 'rebuilding') toast(`Now ${STATE_LABEL[state].toLowerCase()}. GitHub Actions is rebuilding the public site.`);
     else if (r.site === 'not-connected') toast(`Now ${STATE_LABEL[state].toLowerCase()}, but the site was not rebuilt: ${r.note}`, 'err');
     else toast(`Now ${STATE_LABEL[state].toLowerCase()}`);
     reload();
@@ -138,6 +138,7 @@ function Details({ song, reload }: { song: FullSong; reload: () => void }) {
 
 /* ---------- Lyrics ---------- */
 const splitLines = (t: string) => t.replace(/\r/g, '').split('\n').map((l) => l.trim());
+const wordCount = (value: string) => value.split(/\s+/).filter(Boolean).length;
 
 function Lyrics({ song, reload }: { song: FullSong; reload: () => void }) {
   const toast = useToast();
@@ -156,6 +157,29 @@ function Lyrics({ song, reload }: { song: FullSong; reload: () => void }) {
     notes: song.doc.notes || [],
   });
   const errors = docErrors(toDoc());
+  const diagnostics = secs.map((s, sectionIndex) => {
+    const ur = splitLines(s.ur);
+    const ro = splitLines(s.ro);
+    const count = Math.max(ur.length, ro.length);
+    return {
+      sectionIndex,
+      id: s.id,
+      lines: Array.from({ length: count }, (_, line) => {
+        const urWords = wordCount(ur[line] || '');
+        const roWords = wordCount(ro[line] || '');
+        return {
+          line: line + 1,
+          urWords,
+          roWords,
+          issue: urWords !== roWords
+            ? `${s.id}[${line}]: ${urWords} Urdu words, ${roWords} Roman words`
+            : !urWords || !roWords
+              ? `${s.id}[${line}]: ${!urWords ? 'Urdu' : 'Roman'} line is empty`
+              : null,
+        };
+      }).filter((d) => d.issue),
+    };
+  });
   const update = (i: number, patch: Partial<(typeof secs)[number]>) => setSecs(secs.map((s, k) => (k === i ? { ...s, ...patch } : s)));
   const addSection = (type: 'verse' | 'refrain') => {
     const prefix = type === 'refrain' ? 'r' : 'v';
@@ -176,7 +200,11 @@ function Lyrics({ song, reload }: { song: FullSong; reload: () => void }) {
   };
   const save = async () => {
     setBusy(true);
-    try { await api.put(`/admin/songs/${song.id}`, { doc: toDoc() }); toast('Lyrics saved'); reload(); }
+    try {
+      const result = await api.put<{ site?: string; note?: string }>(`/admin/songs/${song.id}`, { doc: toDoc() });
+      toast(result.site === 'rebuilding' ? 'Lyrics saved. GitHub Actions is rebuilding the public site.' : 'Lyrics saved');
+      reload();
+    }
     catch (x) { toast((x as Error).message, 'err'); } finally { setBusy(false); }
   };
 
@@ -200,8 +228,10 @@ function Lyrics({ song, reload }: { song: FullSong; reload: () => void }) {
         </div>
       </section>
 
-      {secs.map((s, i) => (
-        <section class="card admin-card section-edit">
+      {secs.map((s, i) => {
+        const sectionDiagnostics = diagnostics[i];
+        return (
+        <section class={`card admin-card section-edit${sectionDiagnostics.lines.length ? ' section-edit--warning' : ''}`}>
           <header class="section-edit__head">
             <b>{s.id}</b>
             <select class="input input--sm" value={s.type} onChange={(e) => update(i, { type: (e.target as HTMLSelectElement).value as 'verse' })}>
@@ -211,17 +241,31 @@ function Lyrics({ song, reload }: { song: FullSong; reload: () => void }) {
             <button class="icon-btn icon-btn--sm interactive" aria-label="Remove section" onClick={() => removeSection(i)}><Icon name="trash" /></button>
           </header>
           <div class="section-edit__cols">
-            <textarea class="input textarea input--ur" lang="ur" dir="rtl" rows={Math.max(3, splitLines(s.ur).length + 1)} value={s.ur} placeholder="اردو" onInput={(e) => update(i, { ur: (e.target as HTMLTextAreaElement).value })} />
-            <textarea class="input textarea" rows={Math.max(3, splitLines(s.ro).length + 1)} value={s.ro} placeholder="Roman" onInput={(e) => update(i, { ro: (e.target as HTMLTextAreaElement).value })} />
+            <textarea class={`input textarea input--ur${sectionDiagnostics.lines.length ? ' input--warning' : ''}`} lang="ur" dir="rtl" rows={Math.max(3, splitLines(s.ur).length + 1)} value={s.ur} placeholder="اردو" aria-label={`${s.id} Urdu lyrics`} onInput={(e) => update(i, { ur: (e.target as HTMLTextAreaElement).value })} />
+            <textarea class={`input textarea${sectionDiagnostics.lines.length ? ' input--warning' : ''}`} rows={Math.max(3, splitLines(s.ro).length + 1)} value={s.ro} placeholder="Roman" aria-label={`${s.id} Roman lyrics`} onInput={(e) => update(i, { ro: (e.target as HTMLTextAreaElement).value })} />
           </div>
+          {sectionDiagnostics.lines.length > 0 && (
+            <div class="lyrics-diagnostics" role="status">
+              <b>{sectionDiagnostics.lines.length} line warning{sectionDiagnostics.lines.length === 1 ? '' : 's'}</b>
+              {sectionDiagnostics.lines.map((d) => (
+                <span class="lyrics-diagnostics__item">
+                  <strong>Line {d.line}</strong>: {d.urWords} Urdu words / {d.roWords} Roman words
+                </span>
+              ))}
+            </div>
+          )}
         </section>
-      ))}
+        );
+      })}
 
       <div class="form-actions sticky-actions">
         <Button variant="secondary" icon="edit" onClick={() => addSection('verse')}>Add verse</Button>
         <Button variant="secondary" icon="repeat" onClick={() => addSection('refrain')}>Add refrain</Button>
         <span class="spacer" />
-        {errors.length > 0 && <span class="t-body-sm field__error" title={errors.join('\n')}>{errors.length} warning(s): {errors[0]}</span>}
+        {errors.length > 0 && <details class="lyrics-summary">
+          <summary class="t-body-sm field__error">{errors.length} warning(s)</summary>
+          <ul class="issues">{errors.map((error) => <li>{error}</li>)}</ul>
+        </details>}
         <Button onClick={save} disabled={busy}>{busy ? 'Saving…' : 'Save lyrics'}</Button>
       </div>
     </div>

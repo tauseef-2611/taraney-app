@@ -92,19 +92,18 @@ npx wrangler pages secret put ADMIN_EMAIL --project-name=taraney
 npx wrangler pages secret put ADMIN_PASSPHRASE --project-name=taraney
 ```
 
-## 6. First deploy from your PC
+## 6. First deploy from GitHub Actions
 
-```bash
-npm run deploy
-```
+After adding the GitHub secrets in the next step, go to **Actions → Deploy application → Run workflow**.
+This exports **published** songs (none yet), builds, and deploys the site. Open
+`https://taraney.pages.dev/admin`, sign in, open a few taraney, check the lyrics,
+and press **Publish** on each. Saving a published tarana automatically starts the
+next GitHub Actions publish; no local build or deploy is needed.
 
-This exports **published** songs (none yet), builds, and uploads. Open `https://taraney.pages.dev/admin`, sign in, open a few taraney, check the lyrics, and press **Publish** on each. Then deploy again so they appear on the site:
-
-```bash
-npm run deploy
-```
-
-From now on you will use the **Publish site** button in the admin instead (step 8).
+From now on, publishing is handled only by GitHub Actions. Saving a published tarana,
+publishing a draft, or changing the audio/timing of a published tarana automatically
+dispatches the `Publish` workflow. The **Publish site** button in the admin also
+dispatches that workflow manually; no local build or deploy is needed.
 
 ## 7. Connect GitHub Actions
 
@@ -123,7 +122,7 @@ From now on you will use the **Publish site** button in the admin instead (step 
 
 Optional: under **Variables**, set `GEMINI_MODEL` (default `gemini-3.6-flash`).
 
-**c) Test it.** Go to **Actions → Publish → Run workflow**. It should finish green in about 2 minutes. Every push to `main` also publishes.
+**c) Test it.** Go to **Actions → Publish content → Run workflow**. It should finish green in about 2 minutes. Application code pushes use **Deploy application**.
 
 ## 8. Let the admin start workflows
 
@@ -185,7 +184,8 @@ YouTube blocks GitHub Action datacenter IPs ("Sign in to confirm you're not a bo
 | Get audio and timing | Admin → tarana → Audio & sync → Fetch audio + sync |
 | Fix timing | Admin → tarana → Audio & sync → Edit sync |
 | Review reader suggestions | Admin → Suggestions |
-| Make changes live | Admin → Publish on the tarana, then Dashboard → Publish site |
+| Make content changes live | Save the tarana; **Publish content** automatically exports, builds and deploys it |
+| Deploy application changes | Push to `main`; **Deploy application** runs tests, migrations, build and deploy |
 
 ## Free plan limits (for reference)
 

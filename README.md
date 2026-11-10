@@ -36,4 +36,7 @@ npm test
 - Never show empty metadata, an audio player without audio, or sync highlight without timing.
 
 ## Production (later phases)
-Create resources once (`wrangler d1 create taraney-db`, `wrangler r2 bucket create taraney-media` and `taraney-private`), paste the D1 id into `wrangler.toml`, then `npm run db:migrate:prod` and `npm run db:import:prod`. Deploys and ingestion run from GitHub Actions (Phase 1 and 3).
+Create resources once (`wrangler d1 create taraney-db`, `wrangler r2 bucket create taraney-media` and `taraney-private`), paste the D1 id into `wrangler.toml`, then `npm run db:migrate:prod` and `npm run db:import:prod`. Deploys and ingestion run from GitHub Actions (Phase 1 and 3). Application deployments
+and content publishing use separate workflows. The public site is static, so content
+publishing still builds Astro, but skips tests and database migrations. Draft-only saves
+do not trigger a build.

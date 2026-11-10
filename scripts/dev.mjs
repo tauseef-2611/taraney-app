@@ -8,7 +8,9 @@ const run = (cmd, args) => spawn(cmd, args, { stdio: 'inherit', shell: win });
 
 if (!existsSync('dist')) mkdirSync('dist'); // wrangler needs the folder; Astro serves pages in dev
 const fn = run('npx', ['wrangler', 'pages', 'dev', 'dist', '--port', '8788', '--show-interactive-dev-session=false']);
-const site = run('npx', ['astro', 'dev']);
+// Replace a stale `npm run dev` process so the API server is not torn down when
+// Astro refuses to start because port 4321 is already occupied.
+const site = run('npx', ['astro', 'dev', '--force']);
 // On Windows, kill() leaves grandchildren (workerd, astro) running and locking local D1; kill the tree.
 const killTree = (p) => {
   if (!p.pid || p.exitCode !== null) return;

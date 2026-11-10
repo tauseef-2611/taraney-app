@@ -1,6 +1,5 @@
-# Publishes the site: apply D1 migrations, export published songs, build Astro, deploy to Pages.
-# Triggers: push to main, "Publish site" in the admin (workflow_dispatch), or manually in GitHub.
-name: Publish
+# Deploys application code changes. Content-only changes use publish-content.yml.
+name: Deploy application
 
 on:
   push:
@@ -8,11 +7,11 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: publish
-  cancel-in-progress: false
+  group: deploy-application
+  cancel-in-progress: true
 
 jobs:
-  publish:
+  deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:

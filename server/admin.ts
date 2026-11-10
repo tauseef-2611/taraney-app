@@ -12,6 +12,46 @@ import { audioUrl, audit, json, newId, parse, type Ctx, type Env } from './env';
 type App = { Bindings: Env; Variables: { adminId: string; adminEmail: string } };
 export const adminRoutes = new Hono<App>();
 adminRoutes.use('*', requireAdmin);
+const PUBLISH_WORKFLOW = 'publish-content.yml';
+
+async function dispatchPublish(c: Ctx): Promise<{ site: 'rebuilding' | 'not-connected'; note?: string }> {
+  const token = c.env.GH_TOKEN;
+  const repo = c.env.GH_REPO;
+  if (!token || !repo) {
+    return {
+      site: 'not-connected',
+      note: 'Configure GH_TOKEN and GH_REPO on the Cloudflare Pages project.',
+    };
+  }
+  if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) {
+    console.error('Invalid GH_REPO configuration');
+    return { site: 'not-connected', note: 'GH_REPO must be in owner/repository format.' };
+  }
+
+  const response = await fetch(`https://api.github.com/repos/${repo}/actions/workflows/${PUBLISH_WORKFLOW}/dispatches`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/vnd.github+json',
+      Authorization: `Bearer ${token}`,
+      'X-GitHub-Api-Version': '2022-11-28',
+      'User-Agent': 'taraney-admin',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ ref: 'main' }),
+  });
+  if (!response.ok) {
+    const detail = (await response.text()).slice(0, 300);
+    console.error(`GitHub content publish dispatch failed (${response.status}): ${detail}`);
+    return { site: 'not-connected', note: `GitHub rejected the content publish request (${response.status}).` };
+  }
+  return { site: 'rebuilding' };
+}
+
+async function dispatchPublishForSong(c: Ctx, songId: string) {
+  const song = await c.env.DB.prepare('SELECT publish_state FROM songs WHERE id = ?')
+    .bind(songId).first<{ publish_state: string }>();
+  return song?.publish_state === 'published' ? dispatchPublish(c) : undefined;
+}
 
 const STATES = ['draft', 'review', 'published', 'rejected'] as const;
 const AUDIO_EXT: Record<string, string> = { 'audio/mpeg': 'mp3', 'audio/mp4': 'm4a', 'audio/x-m4a': 'm4a', 'audio/aac': 'aac', 'audio/ogg': 'ogg', 'audio/opus': 'opus', 'audio/webm': 'webm', 'audio/wav': 'wav', 'audio/x-wav': 'wav' };
@@ -98,20 +138,79 @@ adminRoutes.get('/songs/:id', async (c) => {
   return c.json({ ...songRow(row), recordings: recs.results.map(recRow) });
 });
 
+adminRoutes.get('/youtube-info', async (c) => {
+  const url = c.req.query('url') || '';
+  const ytid = parseYouTubeId(url);
+  if (!ytid) return c.json({ error: 'Invalid YouTube URL' }, 400);
+  try {
+    const oembedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${ytid}&format=json`;
+    const res = await fetch(oembedUrl);
+    if (!res.ok) return c.json({ ok: true, youtube_id: ytid, title: '', author_name: '', thumbnail_url: `https://i.ytimg.com/vi/${ytid}/hqdefault.jpg` });
+    const data = await res.json() as { title?: string; author_name?: string; thumbnail_url?: string };
+    return c.json({
+      ok: true,
+      youtube_id: ytid,
+      title: data.title || '',
+      author_name: data.author_name || '',
+      thumbnail_url: data.thumbnail_url || `https://i.ytimg.com/vi/${ytid}/hqdefault.jpg`,
+    });
+  } catch {
+    return c.json({ ok: true, youtube_id: ytid, title: '', author_name: '', thumbnail_url: `https://i.ytimg.com/vi/${ytid}/hqdefault.jpg` });
+  }
+});
+
 adminRoutes.post('/songs', async (c) => {
-  const b = await c.req.json<{ title_ur?: string; title_ro?: string; genre?: string; lyrics_ur?: string; lyrics_ro?: string; youtube_url?: string }>();
-  if (!b.title_ur?.trim() && !b.title_ro?.trim()) return c.json({ error: 'Give a title in Urdu or Roman.' }, 400);
+  const b = await c.req.json<{
+    title_ur?: string;
+    title_ro?: string;
+    genre?: string;
+    lyrics_ur?: string;
+    lyrics_ro?: string;
+    youtube_url?: string;
+    queue_ingest?: boolean;
+    singer?: string;
+    poet_ro?: string;
+    poet_ur?: string;
+    themes?: string[];
+    mood?: string;
+  }>();
+
+  const yt = parseYouTubeId(b.youtube_url);
+  const firstLyric = (b.lyrics_ro || b.lyrics_ur || '').trim().split('\n')[0]?.trim();
+  const title_ro = b.title_ro?.trim() || (!b.title_ur?.trim() ? (yt ? 'New Tarana (YouTube)' : (firstLyric || 'Draft Tarana')) : null);
+  const title_ur = b.title_ur?.trim() || null;
+
+  if (!title_ro && !title_ur && !yt) {
+    return c.json({ error: 'Provide at least a YouTube link, lyrics, or a title.' }, 400);
+  }
+
   const id = newId('t');
   const doc = docFromPaste(b.lyrics_ur, b.lyrics_ro);
-  await c.env.DB.prepare(`INSERT INTO songs (id, slug, publish_state, title_ur, title_ro, genre, mood, doc, issues)
-    VALUES (?, ?, 'draft', ?, ?, ?, ?, ?, ?)`).bind(
-    id, await uniqueSlug(c.env.DB, b.title_ro || b.title_ur || id), b.title_ur?.trim() || null, b.title_ro?.trim() || null,
-    b.genre || null, deriveMood(b.genre, []), json(doc), json(doc.sections.length ? docErrors(doc) : []),
+  const themes = Array.isArray(b.themes) ? b.themes : [];
+  const mood = b.mood || deriveMood(b.genre, themes);
+
+  await c.env.DB.prepare(`INSERT INTO songs (id, slug, publish_state, title_ur, title_ro, genre, themes, mood, singer, poet_ro, poet_ur, doc, issues)
+    VALUES (?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
+    id, await uniqueSlug(c.env.DB, title_ro || title_ur || id), title_ur, title_ro,
+    b.genre || null, json(themes), mood, b.singer?.trim() || null, b.poet_ro?.trim() || null, b.poet_ur?.trim() || null,
+    json(doc), json(doc.sections.length ? docErrors(doc) : []),
   ).run();
-  const yt = parseYouTubeId(b.youtube_url);
-  if (yt) await c.env.DB.prepare("INSERT INTO recordings (id, song_id, kind, youtube_id, source_url, label) VALUES (?, ?, 'youtube', ?, ?, 'YouTube')").bind(newId('rec'), id, yt, b.youtube_url).run();
-  await audit(c as Ctx, 'create', id);
-  return c.json({ id });
+
+  let jobId: string | null = null;
+  if (yt) {
+    const recId = newId('rec');
+    await c.env.DB.prepare("INSERT INTO recordings (id, song_id, kind, youtube_id, source_url, label, is_primary) VALUES (?, ?, 'youtube', ?, ?, 'YouTube', 1)")
+      .bind(recId, id, yt, b.youtube_url).run();
+
+    if (b.queue_ingest !== false) {
+      jobId = newId('job');
+      await c.env.DB.prepare("INSERT INTO jobs (id, type, status, step, input, song_id) VALUES (?, 'ingest', 'queued', 'queued – waiting for local worker', ?, ?)")
+        .bind(jobId, json({ recording_id: recId, timing: true, metadata: true, lyrics: true }), id).run();
+    }
+  }
+
+  await audit(c as Ctx, 'create', id, { job: jobId });
+  return c.json({ id, job_id: jobId });
 });
 
 const EDITABLE = ['title_ur', 'title_ro', 'genre', 'themes', 'mood', 'mood_locked', 'poet_ur', 'poet_ro', 'singer', 'tags', 'doc', 'reviewed', 'review_reason'] as const;
@@ -143,7 +242,129 @@ adminRoutes.put('/songs/:id', async (c) => {
   sets.push("updated_at = datetime('now')");
   await c.env.DB.prepare(`UPDATE songs SET ${sets.join(', ')} WHERE id = ?`).bind(...args, id).run();
   await audit(c as Ctx, 'edit', id, Object.keys(b));
-  return c.json({ ok: true });
+  const site = await dispatchPublishForSong(c as Ctx, id);
+  return c.json({ ok: true, ...(site ? site : {}) });
+});
+
+adminRoutes.post('/songs/:id/ai-metadata', async (c) => {
+  const id = c.req.param('id');
+  const song = await c.env.DB.prepare('SELECT * FROM songs WHERE id = ?').bind(id).first<Record<string, unknown>>();
+  if (!song) return c.json({ error: 'Song not found' }, 404);
+
+  const doc = parse<SongDoc>(song.doc, { sections: [], structure: [] });
+  const recs = await c.env.DB.prepare('SELECT * FROM recordings WHERE song_id = ? ORDER BY is_primary DESC').bind(id).all<Record<string, unknown>>();
+  const primaryRec = recs.results[0];
+
+  const apiKey = (c.env as Record<string, string>).GEMINI_API_KEY || (typeof process !== 'undefined' ? process.env?.GEMINI_API_KEY : '');
+  const model = (typeof process !== 'undefined' ? process.env?.GEMINI_MODEL : null) || 'gemini-2.5-flash';
+
+  // If lyrics exist and we have an API key, we can analyze lyrics & metadata directly right here!
+  const lyricsText = doc.sections.map((s) => s.lines.map((l) => `${l.ur || ''} | ${l.ro || ''}`).join('\n')).join('\n\n');
+
+  if (apiKey && (lyricsText.trim() || song.title_ro || song.title_ur || primaryRec?.source_url)) {
+    try {
+      const prompt = `You are an expert archive curator for Urdu taraney (Islamic, patriotic, and poetic songs/nasheeds/nazms).
+Analyze the song details below and extract/generate accurate metadata.
+
+Existing Song Title: ${song.title_ro || song.title_ur || '(none)'}
+Existing Singer: ${song.singer || '(none)'}
+Existing Poet: ${song.poet_ro || song.poet_ur || '(none)'}
+Recording Info: ${primaryRec ? `${primaryRec.label || ''} ${primaryRec.source_url || ''}` : '(none)'}
+
+LYRICS:
+<<<
+${lyricsText.slice(0, 6000)}
+>>>
+
+Tasks:
+1. title_ur: Authentic poetic title in Urdu script (Nastaliq/Arabic script). Clean of noise like "Official Video".
+2. title_ro: Natural Roman Urdu title (e.g. "Lab Pe Aati Hai Dua").
+3. singer: Name of the singer/munshid/qari if identifiable, else null.
+4. poet_ur: Poet/lyricist name in Urdu script if identifiable, else null.
+5. poet_ro: Poet name in Roman Urdu, else null.
+6. genre: Exactly ONE of: hamd, naat, dua, tarana, nazm, ghazal, manqabat, bachon-ki-nazm.
+7. themes: JSON array of 2 to 5 relevant themes. Prioritize matching keys from:
+   ["tawheed", "seerat", "quran", "ramzan", "akhirat", "bedari", "naujawan", "himmat", "tawakkul", "ittehad", "adl-o-insaf", "dawat", "tanzeem", "shakhsiyat", "islah-e-muashra", "istemar", "falasteen", "burma", "bharat", "walidain", "bachpan", "tareekh", "ishq-e-rasool", "khudi", "ijtima"]
+   You may also include clean lowercase custom themes if highly relevant (e.g. "shahadat", "kashmir", "watan").
+8. mood: Exactly ONE of: sukoon, aqeedat, josh, fikr, gham, masoom, generic.
+
+Return ONLY valid JSON matching this schema:
+{
+  "title_ur": "string or null",
+  "title_ro": "string or null",
+  "singer": "string or null",
+  "poet_ur": "string or null",
+  "poet_ro": "string or null",
+  "genre": "string",
+  "themes": ["theme1", "theme2"],
+  "mood": "string"
+}`;
+
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: { responseMimeType: 'application/json', temperature: 0.1 },
+        }),
+      });
+
+      if (res.ok) {
+        const jsonRes = await res.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+        const rawText = jsonRes.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+        const parsed = JSON.parse(rawText) as {
+          title_ur?: string; title_ro?: string; singer?: string; poet_ur?: string; poet_ro?: string;
+          genre?: string; themes?: string[]; mood?: string;
+        };
+
+        const existingThemes = parse<string[]>(song.themes, []);
+        const mergedThemes = Array.from(new Set([...existingThemes, ...(parsed.themes || [])])).slice(0, 8);
+        const finalMood = parsed.mood || deriveMood(parsed.genre || song.genre as string, mergedThemes);
+
+        const newTitleRo = song.title_ro && !song.title_ro.startsWith('New Tarana') && !song.title_ro.startsWith('Draft Tarana')
+          ? song.title_ro
+          : (parsed.title_ro || song.title_ro);
+
+        const newTitleUr = song.title_ur || parsed.title_ur || null;
+
+        await c.env.DB.prepare(`
+          UPDATE songs SET
+            title_ro = COALESCE(?, title_ro),
+            title_ur = COALESCE(?, title_ur),
+            singer = COALESCE(singer, ?),
+            poet_ur = COALESCE(poet_ur, ?),
+            poet_ro = COALESCE(poet_ro, ?),
+            genre = COALESCE(genre, ?),
+            themes = ?,
+            mood = COALESCE(?, mood),
+            updated_at = datetime('now')
+          WHERE id = ?
+        `).bind(
+          newTitleRo, newTitleUr, parsed.singer?.trim() || null,
+          parsed.poet_ur?.trim() || null, parsed.poet_ro?.trim() || null,
+          parsed.genre?.trim() || null, json(mergedThemes), finalMood, id
+        ).run();
+
+        await audit(c as Ctx, 'ai-metadata', id, parsed);
+        const site = await dispatchPublishForSong(c as Ctx, id);
+        return c.json({ ok: true, direct: true, metadata: parsed, ...(site ? site : {}) });
+      }
+    } catch (e) {
+      console.error('Direct Gemini error:', e);
+    }
+  }
+
+  // Fallback: Queue a metadata ingest job for the local PC worker
+  if (!primaryRec) {
+    return c.json({ error: 'Add a recording or lyrics first, or ensure GEMINI_API_KEY is configured.' }, 400);
+  }
+
+  const jobId = newId('job');
+  await c.env.DB.prepare("INSERT INTO jobs (id, type, status, step, input, song_id) VALUES (?, 'ingest', 'queued', 'queued – waiting for local worker', ?, ?)")
+    .bind(jobId, json({ recording_id: primaryRec.id, timing: false, metadata: true }), id).run();
+
+  await audit(c as Ctx, 'ai-metadata-queued', id, { job: jobId });
+  return c.json({ ok: true, direct: false, queued: true, job_id: jobId, note: 'Queued for local worker — run npm run worker on your PC' });
 });
 
 adminRoutes.post('/songs/:id/state', async (c) => {
@@ -153,17 +374,18 @@ adminRoutes.post('/songs/:id/state', async (c) => {
   const prev = await c.env.DB.prepare('SELECT publish_state FROM songs WHERE id = ?').bind(id).first<{ publish_state: string }>();
   await c.env.DB.prepare(`UPDATE songs SET publish_state = ?, updated_at = datetime('now')${state === 'published' ? ", published_at = datetime('now')" : ''} WHERE id = ?`).bind(state, id).run();
   await audit(c as Ctx, `state:${state}`, id);
-  // The public site is static: going live or leaving it needs a rebuild. GitHub queues these, so
-  // publishing several taraney in a row ends in one up-to-date site.
   if (state === 'published' || prev?.publish_state === 'published') {
-    const r = await dispatch(c as Ctx, 'publish.yml', {});
-    return c.json({ ok: true, site: r.ok ? 'rebuilding' : 'not-connected', note: r.ok ? undefined : r.error });
+    const site = await dispatchPublish(c as Ctx);
+    return c.json({ ok: true, ...site });
   }
   return c.json({ ok: true });
 });
 
 adminRoutes.delete('/songs/:id', async (c) => {
   const id = c.req.param('id');
+  const song = await c.env.DB.prepare('SELECT publish_state FROM songs WHERE id = ?')
+    .bind(id).first<{ publish_state: string }>();
+  if (!song) return c.json({ error: 'Not found' }, 404);
   await snapshot(c as Ctx, id);
   const recs = await c.env.DB.prepare('SELECT audio_key FROM recordings WHERE song_id = ?').bind(id).all<{ audio_key: string | null }>();
   for (const r of recs.results) if (r.audio_key && !r.audio_key.startsWith('samples/')) await c.env.MEDIA.delete(r.audio_key);
@@ -172,7 +394,8 @@ adminRoutes.delete('/songs/:id', async (c) => {
     c.env.DB.prepare('DELETE FROM songs WHERE id = ?').bind(id),
   ]);
   await audit(c as Ctx, 'delete', id);
-  return c.json({ ok: true });
+  const site = song.publish_state === 'published' ? await dispatchPublish(c as Ctx) : undefined;
+  return c.json({ ok: true, ...(site ? site : {}) });
 });
 
 /* ---------- Recordings & timing ---------- */
@@ -201,11 +424,15 @@ adminRoutes.post('/songs/:id/recordings', async (c) => {
   }
   await c.env.DB.prepare("UPDATE songs SET updated_at = datetime('now') WHERE id = ?").bind(songId).run();
   await audit(c as Ctx, 'add-recording', songId, recId);
-  return c.json({ id: recId });
+  const site = await dispatchPublishForSong(c as Ctx, songId);
+  return c.json({ id: recId, ...(site ? site : {}) });
 });
 
 adminRoutes.put('/recordings/:rid/timing', async (c) => {
   const rid = c.req.param('rid');
+  const recording = await c.env.DB.prepare('SELECT song_id FROM recordings WHERE id = ?')
+    .bind(rid).first<{ song_id: string }>();
+  if (!recording) return c.json({ error: 'Not found' }, 404);
   const b = await c.req.json<{ lines: TimedLine[]; structure?: string[] | null; duration_ms?: number }>();
   const lines = (b.lines || [])
     .filter((l) => Number.isFinite(l.start_ms) && l.start_ms >= 0 && typeof l.section === 'string')
@@ -214,7 +441,8 @@ adminRoutes.put('/recordings/:rid/timing', async (c) => {
   await c.env.DB.prepare("UPDATE recordings SET lines = ?, structure = ?, sync_level = ?, timing_source = 'studio', duration_ms = COALESCE(?, duration_ms), updated_at = datetime('now') WHERE id = ?")
     .bind(json(lines), b.structure ? json(b.structure) : null, lines.length ? 1 : 0, b.duration_ms ? Math.round(b.duration_ms) : null, rid).run();
   await audit(c as Ctx, 'timing', rid, { lines: lines.length });
-  return c.json({ ok: true, lines: lines.length });
+  const site = await dispatchPublishForSong(c as Ctx, recording.song_id);
+  return c.json({ ok: true, lines: lines.length, ...(site ? site : {}) });
 });
 
 adminRoutes.post('/recordings/:rid/primary', async (c) => {
@@ -225,7 +453,8 @@ adminRoutes.post('/recordings/:rid/primary', async (c) => {
     c.env.DB.prepare('UPDATE recordings SET is_primary = 0 WHERE song_id = ?').bind(r.song_id),
     c.env.DB.prepare('UPDATE recordings SET is_primary = 1 WHERE id = ?').bind(rid),
   ]);
-  return c.json({ ok: true });
+  const site = await dispatchPublishForSong(c as Ctx, r.song_id);
+  return c.json({ ok: true, ...(site ? site : {}) });
 });
 
 adminRoutes.delete('/recordings/:rid', async (c) => {
@@ -235,7 +464,8 @@ adminRoutes.delete('/recordings/:rid', async (c) => {
   if (r.audio_key && !r.audio_key.startsWith('samples/')) await c.env.MEDIA.delete(r.audio_key);
   await c.env.DB.prepare('DELETE FROM recordings WHERE id = ?').bind(rid).run();
   await audit(c as Ctx, 'delete-recording', r.song_id, rid);
-  return c.json({ ok: true });
+  const site = await dispatchPublishForSong(c as Ctx, r.song_id);
+  return c.json({ ok: true, ...(site ? site : {}) });
 });
 
 /* ---------- Local-PC worker: ingest + publish ---------- */
@@ -253,9 +483,8 @@ adminRoutes.post('/recordings/:rid/ingest', async (c) => {
 });
 
 adminRoutes.post('/publish', async (c) => {
-  // Publishing is still a local CLI step: `npm run deploy`
   await audit(c as Ctx, 'publish', 'site');
-  return c.json({ ok: true, note: 'Run `npm run deploy` on your local machine to publish the site.' });
+  return c.json({ ok: true, ...(await dispatchPublish(c as Ctx)) });
 });
 
 adminRoutes.get('/jobs', async (c) => {
