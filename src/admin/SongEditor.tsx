@@ -270,14 +270,13 @@ function Recordings({ song, reload }: { song: FullSong; reload: () => void }) {
                     title={song.doc.sections.length ? 'Gemini drafts line timings from this audio (replaces current timing)' : 'Gemini writes the lyrics from this audio, then drafts line timings'}
                     onClick={async () => {
                       if (r.sync_level && !confirm('Replace the current timing with a new AI draft?')) return;
-                      try { await api.post(`/admin/recordings/${r.id}/ingest`, { timing: true }); toast('Started on GitHub. Takes 1 to 3 minutes; refresh to see it.'); }
+                      try { await api.post(`/admin/recordings/${r.id}/ingest`, { timing: true }); toast('Queued for local worker — run `npm run worker` on your PC'); }
                       catch (x) { toast((x as Error).message, 'err'); }
-                    }}><Icon name="sparkles" />{song.doc.sections.length ? 'AI sync' : 'AI lyrics + sync'}</button>
-                  <a class="btn btn--primary btn--sm interactive" href={`#/songs/${song.id}/audio?rec=${r.id}`}><Icon name="lyrics" />{r.sync_level ? 'Edit sync' : 'Sync by hand'}</a>
+                    }}><Icon name="sparkles" />{song.doc.sections.length ? 'AI sync' : 'AI lyrics + sync'}</button>                  <a class="btn btn--primary btn--sm interactive" href={`#/songs/${song.id}/audio?rec=${r.id}`}><Icon name="lyrics" />{r.sync_level ? 'Edit sync' : 'Sync by hand'}</a>
                 </span>
-              : <button class="btn btn--secondary btn--sm interactive" title="GitHub Actions downloads the audio, drafts lyrics if missing and drafts line timings"
+              : <button class="btn btn--secondary btn--sm interactive" title="Downloads the audio on your local PC via yt-dlp, drafts lyrics and line timings with Gemini"
                   onClick={async () => {
-                    try { await api.post(`/admin/recordings/${r.id}/ingest`, { timing: true }); toast('Started on GitHub. Takes 2 to 5 minutes; refresh to see the audio.'); }
+                    try { await api.post(`/admin/recordings/${r.id}/ingest`, { timing: true }); toast('Queued — run `npm run worker` on your PC to process'); }
                     catch (x) { toast((x as Error).message, 'err'); }
                   }}><Icon name="download" />Fetch audio + sync</button>}
             {!r.is_primary && <button class="btn btn--text btn--sm interactive" onClick={() => primary(r)}>Make primary</button>}

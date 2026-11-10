@@ -144,20 +144,29 @@ npx wrangler pages secret put GH_REPO --project-name=taraney
 For `GH_REPO`, enter `<you>/taraney-app`. Redeploy once (`npm run deploy`) so the secrets take effect.
 
 Now in the admin:
-- **Dashboard → Publish site** rebuilds the public site.
-- **A tarana → Audio & sync → add a YouTube link → Fetch audio + sync** runs the Ingest workflow. It downloads the audio, uploads it to R2, drafts lyrics (only if the song has none: from the video description, otherwise from the audio) and drafts line timings. Refresh after 2 to 5 minutes, then open **Edit sync** to correct the timings, and publish.
+- **Dashboard → Job Queue** monitors queued, running, and completed ingest jobs.
+- **A tarana → Audio & sync → add a YouTube link → Fetch audio + sync** places the job in the queue.
+- Run the local worker on your PC to process the queue:
+  ```bash
+  npm run worker
+  ```
+  The worker inspects how many jobs are pending, asks how many parallel terminals to open (1 to 3 depending on queue depth), asks permission via a Windows popup for each job, and resolves the queue in parallel on your compute. For unattended batch mode without prompts, run `npm run worker:auto`.
 
-## 9. If YouTube blocks GitHub
+## 9. Local Ingestion Worker
 
-YouTube sometimes refuses downloads from GitHub's servers ("Sign in to confirm you're not a bot"). The job then fails with that message. Two options:
+YouTube blocks GitHub Action datacenter IPs ("Sign in to confirm you're not a bot"). Ingestion is therefore handled by your PC's connection using Cloudflare D1 as a work queue.
 
-1. **Run the same ingest from your PC** (your home connection). It writes to the live database and bucket:
+1. **Process jobs with the queue worker**:
+   ```bash
+   npm run worker
+   ```
+   Credentials in `.dev.vars` or `.env` (`GEMINI_API_KEY`, Cloudflare tokens) are automatically picked up.
+2. **Run a single recording directly**:
    ```bash
    npm run ingest -- --recording rec-xxxxxxxxxxxx
    ```
-   The recording id is shown in the admin URL when you open sync, or under **Audio & sync**.
-   On your PC it uses the POC's `.venv` yt-dlp. Set `GEMINI_API_KEY` first in the same terminal (PowerShell: `$env:GEMINI_API_KEY="..."`).
-2. **Upload the audio file** under **Audio & sync**. You own the content, so you can download it from YouTube Studio.
+3. **Upload the audio file**:
+   Alternatively, upload an audio file directly under **Audio & sync** in the admin.
 
 ## 10. Before you announce it
 

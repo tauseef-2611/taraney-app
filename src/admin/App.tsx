@@ -1,4 +1,4 @@
-// Admin single-page app. Hash routes: #/ dashboard, #/songs, #/songs/:id/:tab, #/new, #/inbox/:type
+// Admin single-page app. Hash routes: #/ dashboard, #/songs, #/songs/:id/:tab, #/new, #/inbox/:type, #/queue
 import { useEffect, useState } from 'preact/hooks';
 import { Icon, type IconName } from '../components/ui/Icon';
 import { Button } from '../components/ui/controls';
@@ -8,6 +8,7 @@ import Songs from './Songs';
 import SongEditor from './SongEditor';
 import NewSong from './NewSong';
 import Inbox from './Inbox';
+import Queue from './Queue';
 
 export const go = (hash: string) => { location.hash = hash; };
 const route = () => location.hash.replace(/^#\/?/, '').split('?')[0].split('/').filter(Boolean);
@@ -61,12 +62,14 @@ const NAV: { key: string; label: string; icon: IconName; hash: string }[] = [
   { key: 'songs', label: 'Taraney', icon: 'library', hash: '#/songs' },
   { key: 'new', label: 'New tarana', icon: 'edit', hash: '#/new' },
   { key: 'inbox', label: 'Suggestions', icon: 'sparkles', hash: '#/inbox' },
+  { key: 'queue', label: 'Job Queue', icon: 'music', hash: '#/queue' },
 ];
 
 export default function App() {
   const [me, setMe] = useState<string | null | undefined>(undefined);
   const [parts, setParts] = useState(route());
   const [pending, setPending] = useState(0);
+  const [queuedJobs, setQueuedJobs] = useState(0);
 
   useEffect(() => {
     const on = () => setParts(route());
@@ -79,7 +82,11 @@ export default function App() {
 
   useEffect(() => {
     if (!me) return;
-    api.get<{ pending: Record<string, number> }>('/admin/stats').then((s) => setPending(Object.values(s.pending).reduce((a, b) => a + b, 0))).catch(() => {});
+    api.get<{ pending: Record<string, number>; queued_jobs: number }>('/admin/stats')
+      .then((s) => {
+        setPending(Object.values(s.pending).reduce((a, b) => a + b, 0));
+        setQueuedJobs(s.queued_jobs || 0);
+      }).catch(() => {});
   }, [me, parts.join('/')]);
 
   if (me === undefined) return <div class="admin-loading">Loading…</div>;
@@ -93,6 +100,7 @@ export default function App() {
   else if (section === 'songs') page = <Songs />;
   else if (section === 'new') page = <NewSong />;
   else if (section === 'inbox') page = <Inbox type={a || 'lyrics_fix'} />;
+  else if (section === 'queue') page = <Queue />;
   else page = <Dashboard />;
 
   return (
@@ -104,6 +112,7 @@ export default function App() {
             <a href={n.hash} class={`admin__link interactive${section === n.key ? ' is-active' : ''}`}>
               <Icon name={n.icon} /><span>{n.label}</span>
               {n.key === 'inbox' && pending > 0 && <span class="admin__count">{pending}</span>}
+              {n.key === 'queue' && queuedJobs > 0 && <span class="admin__count">{queuedJobs}</span>}
             </a>
           ))}
         </nav>

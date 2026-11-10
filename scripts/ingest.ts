@@ -1,6 +1,6 @@
 // Ingest one YouTube recording: download audio, normalise, upload to R2, then use Gemini to
 // (a) fill lyrics if the song has none (from the video description, else from the audio) and
-// (b) draft line timings. Runs in GitHub Actions (ingest.yml) or locally:
+// (b) draft line timings. Runs locally via the worker (scripts/worker.ts) or standalone:
 //   npm run ingest -- --recording rec-xxxx [--job job-xxxx] [--local] [--no-timing]
 // Needs: python -m yt_dlp, GEMINI_API_KEY (unless --no-ai), and wrangler auth for --remote.
 import { spawnSync } from 'node:child_process';
@@ -11,6 +11,23 @@ import ffmpeg from 'ffmpeg-static';
 import { GoogleGenAI, Type, createPartFromUri } from '@google/genai';
 import { docFromPaste } from '../src/lib/paste.ts';
 import { docErrors, expandSung } from '../src/lib/song-shape.ts';
+
+// Auto-load .dev.vars / .env so standalone `npm run ingest` picks up keys without manual export.
+function loadDevVars() {
+  for (const p of [resolve('.dev.vars'), resolve('.env')]) {
+    if (!existsSync(p)) continue;
+    for (const line of readFileSync(p, 'utf8').split('\n')) {
+      const t = line.trim();
+      if (!t || t.startsWith('#')) continue;
+      const eq = t.indexOf('=');
+      if (eq < 1) continue;
+      const key = t.slice(0, eq).trim();
+      const val = t.slice(eq + 1).trim().replace(/^["']|["']$/g, '');
+      if (key && !(key in process.env)) process.env[key] = val;
+    }
+  }
+}
+loadDevVars();
 
 const args = process.argv.slice(2);
 const arg = (k: string) => { const i = args.indexOf(`--${k}`); return i >= 0 ? args[i + 1] : undefined; };
@@ -70,9 +87,31 @@ async function fromYouTube(url: string, rec: Record<string, unknown>, out: strin
   // 1. Download audio + metadata (description). Owner content; no cookies or bot-check workarounds.
   job('running', 'download');
   log(`downloading ${url}`);
-  const py = process.env.PYTHON || (existsSync('../taraney/.venv/Scripts/python.exe') ? '../taraney/.venv/Scripts/python.exe' : 'python3');
-  const dl = spawnSync(py, ['-m', 'yt_dlp', '--ignore-config', '--no-playlist', '--no-progress', '-x', '--audio-format', 'm4a',
-    '--ffmpeg-location', ffmpeg as unknown as string, '--write-info-json', '-o', join(WORK, 'source.%(ext)s'), '--', url], { encoding: 'utf8' });
+  // Discover the best available Python/yt-dlp on this machine.
+  // Order: env PYTHON > local venv > py launcher (Windows) > python > python3 > yt-dlp standalone.
+  const py = (() => {
+    if (process.env.PYTHON) return { cmd: process.env.PYTHON, args: ['-m', 'yt_dlp'] };
+    const venv = existsSync('../taraney/.venv/Scripts/python.exe')
+      ? '../taraney/.venv/Scripts/python.exe'
+      : existsSync('.venv/Scripts/python.exe') ? '.venv/Scripts/python.exe' : null;
+    if (venv) return { cmd: venv, args: ['-m', 'yt_dlp'] };
+    // Windows: `py -3` hits the Python Launcher; faster than hunting PATH
+    if (process.platform === 'win32') {
+      const pyLauncher = spawnSync('py', ['-3', '--version'], { encoding: 'utf8', shell: false });
+      if (pyLauncher.status === 0) return { cmd: 'py', args: ['-3', '-m', 'yt_dlp'] };
+      // Try standalone yt-dlp.exe on Windows
+      const ytDlpExe = spawnSync('yt-dlp', ['--version'], { encoding: 'utf8', shell: false });
+      if (ytDlpExe.status === 0) return { cmd: 'yt-dlp', args: [] };
+    }
+    return { cmd: 'python3', args: ['-m', 'yt_dlp'] };
+  })();
+  const ytArgs = [
+    ...py.args,
+    '--ignore-config', '--no-playlist', '--no-progress', '-x', '--audio-format', 'm4a',
+    '--ffmpeg-location', ffmpeg as unknown as string, '--write-info-json',
+    '-o', join(WORK, 'source.%(ext)s'), '--', url,
+  ];
+  const dl = spawnSync(py.cmd, ytArgs, { encoding: 'utf8', shell: false });
   const src = readdirSync(WORK).find((f) => f.startsWith('source.') && f.endsWith('.m4a'));
   if (dl.status !== 0 || !src) {
     const detail = (dl.stderr || '').trim().split('\n').slice(-2).join(' ');

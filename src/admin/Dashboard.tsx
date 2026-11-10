@@ -5,6 +5,7 @@ import { api } from './api';
 interface Stats {
   songs: Record<string, number>; pending: Record<string, number>; issues: number;
   recordings: { total: number; synced: number };
+  queued_jobs: number;
   activity: { actor: string; action: string; entity: string; created_at: string }[];
 }
 
@@ -30,10 +31,11 @@ export default function Dashboard() {
       <header class="admin-head">
         <h1 class="t-headline-md">Dashboard</h1>
         <div class="form-actions">
-          <button class="btn btn--secondary interactive" onClick={async () => {
-            if (!confirm('Rebuild and deploy the public site with all published taraney?')) return;
-            try { await api.post('/admin/publish'); alert('Publishing on GitHub. The site updates in about 2 minutes.'); }
-            catch (x) { alert((x as Error).message); }
+          <a class="btn btn--secondary interactive" href="#/queue">
+            <Icon name="download" />Job Queue{s.queued_jobs > 0 && <span class="admin__count">{s.queued_jobs}</span>}
+          </a>
+          <button class="btn btn--secondary interactive" onClick={() => {
+            alert('To publish the site, run this in your terminal:\n\n  npm run deploy\n\nThis builds and deploys to Cloudflare Pages.');
           }}><Icon name="share" />Publish site</button>
           <a class="btn btn--primary interactive" href="#/new"><Icon name="edit" />New tarana</a>
         </div>

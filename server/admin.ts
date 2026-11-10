@@ -52,11 +52,12 @@ async function snapshot(c: Ctx, songId: string) {
 /* ---------- Dashboard ---------- */
 adminRoutes.get('/stats', async (c) => {
   const db = c.env.DB;
-  const [states, subs, recs, recent] = await Promise.all([
+  const [states, subs, recs, recent, queuedJobs] = await Promise.all([
     db.prepare('SELECT publish_state AS k, COUNT(*) AS n FROM songs GROUP BY publish_state').all<{ k: string; n: number }>(),
     db.prepare("SELECT type AS k, COUNT(*) AS n FROM submissions WHERE status = 'pending' GROUP BY type").all<{ k: string; n: number }>(),
     db.prepare('SELECT COUNT(*) AS total, SUM(sync_level = 1) AS synced FROM recordings').first<{ total: number; synced: number }>(),
     db.prepare('SELECT actor, action, entity, created_at FROM audit_log ORDER BY id DESC LIMIT 8').all(),
+    db.prepare("SELECT COUNT(*) AS n FROM jobs WHERE status IN ('queued', 'running')").first<{ n: number }>(),
   ]);
   const issues = await db.prepare("SELECT COUNT(*) AS n FROM songs WHERE issues <> '[]'").first<{ n: number }>();
   return c.json({
@@ -65,6 +66,7 @@ adminRoutes.get('/stats', async (c) => {
     recordings: { total: recs?.total || 0, synced: recs?.synced || 0 },
     issues: issues?.n || 0,
     activity: recent.results,
+    queued_jobs: queuedJobs?.n || 0,
   });
 });
 
@@ -236,17 +238,7 @@ adminRoutes.delete('/recordings/:rid', async (c) => {
   return c.json({ ok: true });
 });
 
-/* ---------- GitHub Actions: ingest + publish ---------- */
-async function dispatch(c: Ctx, workflow: string, inputs: Record<string, string | boolean>) {
-  if (!c.env.GH_TOKEN || !c.env.GH_REPO) return { ok: false, error: 'GitHub is not connected. Set GH_TOKEN and GH_REPO secrets (see DEPLOY.md).' };
-  const res = await fetch(`https://api.github.com/repos/${c.env.GH_REPO}/actions/workflows/${workflow}/dispatches`, {
-    method: 'POST',
-    headers: { authorization: `Bearer ${c.env.GH_TOKEN}`, accept: 'application/vnd.github+json', 'user-agent': 'taraney-admin', 'x-github-api-version': '2022-11-28' },
-    body: JSON.stringify({ ref: 'main', inputs }),
-  });
-  return res.ok ? { ok: true } : { ok: false, error: `GitHub refused (${res.status}): ${(await res.text()).slice(0, 200)}` };
-}
-
+/* ---------- Local-PC worker: ingest + publish ---------- */
 adminRoutes.post('/recordings/:rid/ingest', async (c) => {
   const rid = c.req.param('rid');
   const rec = await c.env.DB.prepare('SELECT song_id, youtube_id, audio_key FROM recordings WHERE id = ?').bind(rid).first<{ song_id: string; youtube_id: string | null; audio_key: string | null }>();
@@ -254,27 +246,45 @@ adminRoutes.post('/recordings/:rid/ingest', async (c) => {
   if (!rec?.youtube_id && !rec?.audio_key) return c.json({ error: 'This recording has no audio or YouTube link.' }, 400);
   const { timing = true } = await c.req.json<{ timing?: boolean }>().catch(() => ({ timing: true }));
   const jobId = newId('job');
-  await c.env.DB.prepare("INSERT INTO jobs (id, type, status, step, input, song_id) VALUES (?, 'ingest', 'queued', 'waiting for GitHub', ?, ?)")
+  await c.env.DB.prepare("INSERT INTO jobs (id, type, status, step, input, song_id) VALUES (?, 'ingest', 'queued', 'queued – waiting for local worker', ?, ?)")
     .bind(jobId, json({ recording_id: rid, timing }), rec.song_id).run();
-  const r = await dispatch(c as Ctx, 'ingest.yml', { recording_id: rid, job_id: jobId, timing });
-  if (!r.ok) {
-    await c.env.DB.prepare("UPDATE jobs SET status = 'failed', error = ? WHERE id = ?").bind(r.error, jobId).run();
-    return c.json({ error: `${r.error} Locally you can run: npm run ingest -- --recording ${rid} --job ${jobId} --local` }, 400);
-  }
   await audit(c as Ctx, 'ingest', rid, { job: jobId });
   return c.json({ ok: true, job_id: jobId });
 });
 
 adminRoutes.post('/publish', async (c) => {
-  const r = await dispatch(c as Ctx, 'publish.yml', {});
-  if (!r.ok) return c.json({ error: `${r.error} Locally: npm run deploy` }, 400);
+  // Publishing is still a local CLI step: `npm run deploy`
   await audit(c as Ctx, 'publish', 'site');
-  return c.json({ ok: true });
+  return c.json({ ok: true, note: 'Run `npm run deploy` on your local machine to publish the site.' });
 });
 
 adminRoutes.get('/jobs', async (c) => {
-  const rows = await c.env.DB.prepare('SELECT id, type, status, step, error, input, song_id, created_at, updated_at FROM jobs ORDER BY created_at DESC LIMIT 30').all();
+  const rows = await c.env.DB.prepare(`
+    SELECT j.id, j.type, j.status, j.step, j.error, j.input, j.song_id,
+           s.title_ro, s.title_ur, j.created_at, j.updated_at
+    FROM jobs j LEFT JOIN songs s ON s.id = j.song_id
+    ORDER BY j.created_at DESC LIMIT 100`).all();
   return c.json(rows.results.map((r) => ({ ...r, input: parse(r.input, {}) })));
+});
+
+adminRoutes.post('/jobs/:id/retry', async (c) => {
+  const id = c.req.param('id');
+  const job = await c.env.DB.prepare('SELECT id, status FROM jobs WHERE id = ?').bind(id).first<{ id: string; status: string }>();
+  if (!job) return c.json({ error: 'Job not found' }, 404);
+  if (job.status === 'running') return c.json({ error: 'Job is currently running' }, 400);
+  await c.env.DB.prepare("UPDATE jobs SET status = 'queued', step = 'queued – waiting for local worker', error = NULL, updated_at = datetime('now') WHERE id = ?").bind(id).run();
+  return c.json({ ok: true });
+});
+
+adminRoutes.post('/jobs/:id/cancel', async (c) => {
+  const id = c.req.param('id');
+  await c.env.DB.prepare("UPDATE jobs SET status = 'cancelled', updated_at = datetime('now') WHERE id = ? AND status IN ('queued', 'running')").bind(id).run();
+  return c.json({ ok: true });
+});
+
+adminRoutes.delete('/jobs/:id', async (c) => {
+  await c.env.DB.prepare('DELETE FROM jobs WHERE id = ?').bind(c.req.param('id')).run();
+  return c.json({ ok: true });
 });
 
 /* ---------- Submissions (from readers) ---------- */

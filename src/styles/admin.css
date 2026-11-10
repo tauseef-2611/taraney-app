@@ -134,6 +134,21 @@ p.diff__new { padding: var(--space-3) var(--space-4); border-radius: var(--radiu
 .login__brand { font: var(--type-title-md); display: flex; gap: var(--space-3); align-items: baseline; }
 .login__brand [lang="ur"] { font: var(--type-headline-md); line-height: 1.4; color: var(--color-accent); }
 
+/* Job Queue */
+.badge--warning { background: color-mix(in oklab, oklch(80% 0.18 80) 20%, transparent); color: oklch(45% 0.18 80); }
+.badge--info    { background: color-mix(in oklab, var(--color-primary) 15%, transparent); color: var(--color-accent); }
+.badge--success { background: color-mix(in oklab, var(--color-tertiary) 18%, transparent); color: var(--color-tertiary); }
+@keyframes badge-pulse { 0%,100% { opacity: 1 } 50% { opacity: .55 } }
+.badge--pulse { animation: badge-pulse 1.6s ease-in-out infinite; }
+
+.code-pill { display: inline-block; padding: var(--space-1) var(--space-3); border-radius: var(--radius-sm); background: var(--color-surface-container-lowest); font-family: ui-monospace, monospace; font-size: .85em; color: var(--color-on-surface); border: 1px solid var(--color-outline-variant); }
+
+.data-table { width: 100%; border-collapse: collapse; font: var(--type-body-md); }
+.data-table th { text-align: left; padding: var(--space-3) var(--space-4); font: var(--type-label-md); color: var(--color-on-surface-variant); border-bottom: 1px solid var(--color-outline-variant); white-space: nowrap; }
+.data-table td { padding: var(--space-3) var(--space-4); border-bottom: 1px solid color-mix(in oklab, var(--color-outline-variant) 50%, transparent); vertical-align: middle; }
+.data-table tr.row--active td { background: color-mix(in oklab, var(--color-primary) 6%, transparent); }
+.c-error { color: var(--color-error); }
+
 @media (max-width: 860px) {
   .admin { grid-template-columns: 1fr; }
   .admin__nav { position: sticky; top: 0; z-index: 10; height: auto; flex-direction: row; align-items: center; padding: var(--space-3) var(--space-4); overflow-x: auto; border-inline-end: 0; border-bottom: 1px solid var(--color-outline-variant); }
