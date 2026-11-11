@@ -23,7 +23,7 @@
 //
 import { spawnSync, spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { d1Read, d1Write, q } from './d1.ts';
 
@@ -122,8 +122,11 @@ function peekQueued(): QueuedJob[] {
   } catch { return []; }
 }
 
-/** Atomically claim the next queued job. Returns job or null if nothing left (or already taken). */
-function claimNext(): (QueuedJob & { input_parsed: { recording_id: string; timing?: boolean } }) | null {
+/** Another worker took the job first: try again straight away. */
+const LOST = 'lost' as const;
+
+/** Atomically claim the next queued job. Returns the job, null when the queue is empty, or LOST. */
+function claimNext(): (QueuedJob & { input_parsed: { recording_id: string; timing?: boolean } }) | null | typeof LOST {
   const rows = d1Read(true, `
     SELECT j.id, j.status, j.input, j.song_id, s.title_ro, s.title_ur, j.created_at
     FROM jobs j LEFT JOIN songs s ON s.id = j.song_id
@@ -132,11 +135,12 @@ function claimNext(): (QueuedJob & { input_parsed: { recording_id: string; timin
   `) as QueuedJob[];
   if (!rows.length) return null;
   const job = rows[0];
-  // Atomic conditional update — only succeeds if still 'queued'
-  d1Write(true, `UPDATE jobs SET status = 'running', step = 'claimed by local worker', updated_at = datetime('now') WHERE id = ${q(job.id)} AND status = 'queued';`);
-  // Verify we actually got it (another worker may have taken it)
+  // Atomic conditional update: only one worker's UPDATE can match while the job is still 'queued'.
+  // Each worker writes its own unique token, so the check below tells us whether WE won the race.
+  const token = `claimed by local worker W${WORKER_ID}-${Math.random().toString(36).slice(2, 8)}`;
+  d1Write(true, `UPDATE jobs SET status = 'running', step = ${q(token)}, updated_at = datetime('now') WHERE id = ${q(job.id)} AND status = 'queued';`);
   const check = d1Read(true, `SELECT status, step FROM jobs WHERE id = ${q(job.id)}`) as { status: string; step: string }[];
-  if (!check.length || check[0].status !== 'running' || !check[0].step?.includes('local worker')) return null;
+  if (!check.length || check[0].status !== 'running' || check[0].step !== token) return LOST;
   let input_parsed = { recording_id: '', timing: true };
   try { input_parsed = JSON.parse(job.input || '{}'); } catch {}
   return { ...job, input_parsed };
@@ -149,10 +153,12 @@ function markFailed(jobId: string, message: string) {
 }
 
 // ─── optimal worker count ────────────────────────────────────────────────────
+const MAX_WORKERS = 4;
 function suggestWorkers(queued: number): number {
   if (queued <= 2) return 1;
   if (queued <= 5) return 2;
-  return 3;
+  if (queued <= 9) return 3;
+  return MAX_WORKERS;
 }
 
 // ─── run ingest for one job ───────────────────────────────────────────────────
@@ -180,6 +186,7 @@ async function runAsWorker() {
 
   while (true) {
     const job = claimNext();
+    if (job === LOST) { await new Promise((r) => setTimeout(r, 300 + Math.random() * 700)); continue; }
 
     if (!job) {
       consecutive_empty++;
@@ -265,20 +272,21 @@ async function runAsOrchestrator() {
   if (count > 8) info(`  … and ${count - 8} more`);
   sep();
   console.log(`${BOLD}  Suggested parallel workers: ${suggested}${RESET}`);
-  console.log(`${DIM}  (1–2 jobs → 1 worker, 3–5 → 2 workers, 6+ → 3 workers)${RESET}`);
+  console.log(`${DIM}  (1–2 jobs → 1 worker, 3–5 → 2, 6–9 → 3, 10+ → 4)${RESET}`);
   sep();
 
-  // Ask how many workers to open (or accept suggestion)
+  // Ask how many workers to open (or accept suggestion). Never more workers than jobs.
   let workerCount = suggested;
   if (!IS_AUTO) {
     const ans = await ask(
-      `Open how many parallel workers? (Enter = ${suggested}, or type 1/2/3, q = quit)`,
-      [`${suggested}`, '1', '2', '3', 'q']
+      `Open how many parallel workers? (Enter = ${suggested}, or 1-${MAX_WORKERS}, q = quit)`,
+      [`${suggested}`, '1', '2', '3', '4', 'q']
     );
     if (ans === 'q' || ans === 'n') { info('Cancelled.'); process.exit(0); }
     const parsed = parseInt(ans, 10);
-    if (!isNaN(parsed) && parsed >= 1 && parsed <= 3) workerCount = parsed;
+    if (!isNaN(parsed) && parsed >= 1 && parsed <= MAX_WORKERS) workerCount = parsed;
   }
+  workerCount = Math.min(workerCount, count);
 
   if (workerCount === 0) { info('Nothing to do.'); process.exit(0); }
 
@@ -295,9 +303,23 @@ async function runAsOrchestrator() {
     ];
 
     if (IS_WIN) {
-      // Quote paths to handle spaces safely, and execute via cmd /c
-      const cmdLine = `start "Taraney Worker ${i}" cmd /k ""${node}" ${args.map(a => `"${a}"`).join(' ')}"`;
-      spawnSync('cmd.exe', ['/c', cmdLine], { windowsVerbatimArguments: true });
+      // A one-line `start … cmd /k ""node" "…""` is fragile: cmd's nested-quote rules misparse it and
+      // only some windows open. Instead write a small launcher .cmd per worker and start that file.
+      mkdirSync(resolve('.wrangler'), { recursive: true });
+      const launcher = resolve('.wrangler', `worker-${i}.cmd`);
+      writeFileSync(launcher, [
+        '@echo off',
+        `title Taraney Worker ${i}`,
+        `cd /d "${process.cwd()}"`,
+        `"${node}" ${args.map((a) => `"${a}"`).join(' ')}`,
+        'echo.',
+        `echo Worker ${i} has stopped. Press any key to close this window.`,
+        'pause >nul',
+        '',
+      ].join('\r\n'));
+      // `start "" file` opens a new console window and returns immediately.
+      const r = spawnSync('cmd.exe', ['/d', '/c', 'start', `Taraney Worker ${i}`, launcher], { stdio: 'ignore' });
+      if (r.status !== 0) err(`  Could not open window for worker ${i} (exit ${r.status}). Run it by hand: ${launcher}`);
     } else if (process.platform === 'darwin') {
       // macOS Terminal.app
       const cmd = `"${node}" ${args.map((a) => `'${a}'`).join(' ')}`;

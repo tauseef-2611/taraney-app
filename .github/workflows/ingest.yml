@@ -17,8 +17,9 @@ on:
         type: boolean
         default: true
 
+# One run per recording at a time; different recordings run in parallel.
 concurrency:
-  group: ingest
+  group: ingest-${{ inputs.recording_id }}
   cancel-in-progress: false
 
 jobs:

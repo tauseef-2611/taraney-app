@@ -8,6 +8,7 @@ import { sectionText } from '../lib/paste';
 import type { Section, SongDoc, TimedLine } from '../lib/types';
 import { api } from './api';
 import { go, useToast } from './App';
+import { askPublish, siteNote } from './publish';
 import { STATE_LABEL } from './Songs';
 import SyncStudio from './SyncStudio';
 
@@ -57,6 +58,7 @@ export default function SongEditor({ id, tab }: { id: string; tab: string }) {
 /* ---------- Details ---------- */
 function Details({ song, reload }: { song: FullSong; reload: () => void }) {
   const toast = useToast();
+  const live = song.publish_state === 'published';
   const [f, setF] = useState({ ...song });
   const [busy, setBusy] = useState(false);
   const set = (k: keyof FullSong) => (e: Event) => setF({ ...f, [k]: (e.target as HTMLInputElement).value });
@@ -65,24 +67,29 @@ function Details({ song, reload }: { song: FullSong; reload: () => void }) {
   const save = async () => {
     setBusy(true);
     try {
-      const result = await api.put<{ site?: string; note?: string }>(`/admin/songs/${song.id}`, {
+      const result = await api.put<{ site?: string; note?: string }>(`/admin/songs/${song.id}${askPublish(live, 'Details saved.')}`, {
         title_ro: f.title_ro, title_ur: f.title_ur, genre: f.genre, themes: f.themes, mood: f.mood, mood_locked: f.mood_locked,
         poet_ro: f.poet_ro, poet_ur: f.poet_ur, singer: f.singer, reviewed: f.reviewed,
       });
-      toast(result.site === 'rebuilding' ? 'Saved. GitHub Actions is rebuilding the public site.' : 'Saved'); reload();
+      toast(...siteNote('Saved', result)); reload();
     } catch (x) { toast((x as Error).message, 'err'); } finally { setBusy(false); }
   };
   const setState = async (state: string) => {
     if (state === 'published' && song.issues.length && !confirm(`This tarana has ${song.issues.length} issue(s). Publish anyway?`)) return;
-    const r = await api.post<{ site?: string; note?: string }>(`/admin/songs/${song.id}/state`, { state });
-    if (r.site === 'rebuilding') toast(`Now ${STATE_LABEL[state].toLowerCase()}. GitHub Actions is rebuilding the public site.`);
-    else if (r.site === 'not-connected') toast(`Now ${STATE_LABEL[state].toLowerCase()}, but the site was not rebuilt: ${r.note}`, 'err');
-    else toast(`Now ${STATE_LABEL[state].toLowerCase()}`);
+    const label = STATE_LABEL[state].toLowerCase();
+    // Going live, or leaving the live site: ask whether to rebuild now or batch it with others.
+    const touchesLive = state === 'published' || live;
+    const now = touchesLive && confirm(state === 'published'
+      ? 'Mark as published.\n\nPut it on the public site now?\n\nOK: publish now (about 2 minutes)\nCancel: later, together with others (Dashboard → Publish site)'
+      : `Move to ${label}.\n\nRemove it from the public site now?\n\nOK: update the site now\nCancel: later (Dashboard → Publish site)`);
+    const r = await api.post<{ site?: string; note?: string }>(`/admin/songs/${song.id}/state${now ? '?publish=now' : ''}`, { state });
+    toast(...siteNote(`Now ${label}`, r));
     reload();
   };
   const remove = async () => {
     if (!confirm('Delete this tarana and its recordings? A copy stays in version history, but the audio files are removed.')) return;
-    await api.del(`/admin/songs/${song.id}`); toast('Deleted'); go('#/songs');
+    const r = await api.del<{ site?: string; note?: string }>(`/admin/songs/${song.id}${askPublish(live, 'Deleting a live tarana.')}`);
+    toast(...siteNote('Deleted', r)); go('#/songs');
   };
 
   return (
@@ -201,8 +208,8 @@ function Lyrics({ song, reload }: { song: FullSong; reload: () => void }) {
   const save = async () => {
     setBusy(true);
     try {
-      const result = await api.put<{ site?: string; note?: string }>(`/admin/songs/${song.id}`, { doc: toDoc() });
-      toast(result.site === 'rebuilding' ? 'Lyrics saved. GitHub Actions is rebuilding the public site.' : 'Lyrics saved');
+      const result = await api.put<{ site?: string; note?: string }>(`/admin/songs/${song.id}${askPublish(song.publish_state === 'published', 'Lyrics saved.')}`, { doc: toDoc() });
+      toast(...siteNote('Lyrics saved', result));
       reload();
     }
     catch (x) { toast((x as Error).message, 'err'); } finally { setBusy(false); }
@@ -290,11 +297,22 @@ function Recordings({ song, reload }: { song: FullSong; reload: () => void }) {
     } else fd.set('youtube_url', yt);
     fd.set('label', label);
     setBusy(true);
-    try { await api.post(`/admin/songs/${song.id}/recordings`, fd); toast('Recording added'); setFile(null); setYt(''); setLabel(''); reload(); }
+    try {
+      const r = await api.post<{ site?: string; note?: string }>(`/admin/songs/${song.id}/recordings${askPublish(song.publish_state === 'published', 'Recording added.')}`, fd);
+      toast(...siteNote('Recording added', r)); setFile(null); setYt(''); setLabel(''); reload();
+    }
     catch (x) { toast((x as Error).message, 'err'); } finally { setBusy(false); }
   };
-  const del = async (r: Rec) => { if (confirm('Delete this recording and its timing?')) { await api.del(`/admin/recordings/${r.id}`); reload(); } };
-  const primary = async (r: Rec) => { await api.post(`/admin/recordings/${r.id}/primary`); reload(); };
+  const live = song.publish_state === 'published';
+  const del = async (r: Rec) => {
+    if (!confirm('Delete this recording and its timing?')) return;
+    toast(...siteNote('Recording deleted', await api.del(`/admin/recordings/${r.id}${askPublish(live, 'Recording deleted.')}`)));
+    reload();
+  };
+  const primary = async (r: Rec) => {
+    toast(...siteNote('Primary recording changed', await api.post(`/admin/recordings/${r.id}/primary${askPublish(live, 'Primary recording changed.')}`)));
+    reload();
+  };
 
   return (
     <div class="admin-cols admin-cols--wide">

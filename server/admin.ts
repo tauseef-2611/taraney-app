@@ -47,10 +47,22 @@ async function dispatchPublish(c: Ctx): Promise<{ site: 'rebuilding' | 'not-conn
   return { site: 'rebuilding' };
 }
 
-async function dispatchPublishForSong(c: Ctx, songId: string) {
+/**
+ * The site is rebuilt only when the admin asks: Dashboard → Publish site, or "Publish now"
+ * when saving a live tarana (the client adds ?publish=now). Otherwise a change to a live
+ * tarana waits, and the dashboard shows it as pending.
+ */
+async function publishSite(c: Ctx) {
+  const r = await dispatchPublish(c);
+  if (r.site === 'rebuilding') await audit(c, 'publish', 'site');
+  return r;
+}
+async function dispatchPublishForSong(c: Ctx, songId: string, wasLive = false): Promise<{ site: 'rebuilding' | 'not-connected' | 'pending'; note?: string } | undefined> {
   const song = await c.env.DB.prepare('SELECT publish_state FROM songs WHERE id = ?')
     .bind(songId).first<{ publish_state: string }>();
-  return song?.publish_state === 'published' ? dispatchPublish(c) : undefined;
+  const live = wasLive || song?.publish_state === 'published';
+  if (!live) return undefined;
+  return c.req.query('publish') === 'now' ? publishSite(c) : { site: 'pending' };
 }
 
 const STATES = ['draft', 'review', 'published', 'rejected'] as const;
@@ -374,11 +386,8 @@ adminRoutes.post('/songs/:id/state', async (c) => {
   const prev = await c.env.DB.prepare('SELECT publish_state FROM songs WHERE id = ?').bind(id).first<{ publish_state: string }>();
   await c.env.DB.prepare(`UPDATE songs SET publish_state = ?, updated_at = datetime('now')${state === 'published' ? ", published_at = datetime('now')" : ''} WHERE id = ?`).bind(state, id).run();
   await audit(c as Ctx, `state:${state}`, id);
-  if (state === 'published' || prev?.publish_state === 'published') {
-    const site = await dispatchPublish(c as Ctx);
-    return c.json({ ok: true, ...site });
-  }
-  return c.json({ ok: true });
+  const site = await dispatchPublishForSong(c as Ctx, id, prev?.publish_state === 'published');
+  return c.json({ ok: true, ...(site || {}) });
 });
 
 adminRoutes.delete('/songs/:id', async (c) => {
@@ -394,7 +403,7 @@ adminRoutes.delete('/songs/:id', async (c) => {
     c.env.DB.prepare('DELETE FROM songs WHERE id = ?').bind(id),
   ]);
   await audit(c as Ctx, 'delete', id);
-  const site = song.publish_state === 'published' ? await dispatchPublish(c as Ctx) : undefined;
+  const site = await dispatchPublishForSong(c as Ctx, id, song.publish_state === 'published');
   return c.json({ ok: true, ...(site ? site : {}) });
 });
 
@@ -483,8 +492,21 @@ adminRoutes.post('/recordings/:rid/ingest', async (c) => {
 });
 
 adminRoutes.post('/publish', async (c) => {
-  await audit(c as Ctx, 'publish', 'site');
-  return c.json({ ok: true, ...(await dispatchPublish(c as Ctx)) });
+  return c.json({ ok: true, ...(await publishSite(c as Ctx)) });
+});
+
+/** Live taraney changed since the last site publish (shown on the dashboard). */
+adminRoutes.get('/publish/pending', async (c) => {
+  const db = c.env.DB;
+  const last = await db.prepare("SELECT MAX(created_at) AS at FROM audit_log WHERE action = 'publish'").first<{ at: string | null }>();
+  const since = last?.at || '1970-01-01';
+  const changed = await db.prepare(`
+    SELECT COUNT(*) AS n FROM (
+      SELECT id FROM songs WHERE publish_state = 'published' AND updated_at > ?
+      UNION
+      SELECT entity FROM audit_log WHERE created_at > ? AND (action LIKE 'state:%' OR action = 'delete')
+    )`).bind(since, since).first<{ n: number }>();
+  return c.json({ last_published_at: last?.at || null, pending: changed?.n || 0 });
 });
 
 adminRoutes.get('/jobs', async (c) => {

@@ -12,7 +12,11 @@ interface Stats {
 export default function Dashboard() {
   const [s, setS] = useState<Stats | null>(null);
   const [publishing, setPublishing] = useState(false);
-  useEffect(() => { api.get<Stats>('/admin/stats').then(setS); }, []);
+  const [pending, setPending] = useState<{ pending: number; last_published_at: string | null }>({ pending: 0, last_published_at: null });
+  useEffect(() => {
+    api.get<Stats>('/admin/stats').then(setS);
+    api.get<typeof pending>('/admin/publish/pending').then(setPending).catch(() => {});
+  }, []);
   if (!s) return <div class="admin-loading">Loading…</div>;
   const total = Object.values(s.songs).reduce((a, b) => a + b, 0);
   const tiles = [
@@ -35,19 +39,23 @@ export default function Dashboard() {
           <a class="btn btn--secondary interactive" href="#/queue">
             <Icon name="download" />Job Queue{s.queued_jobs > 0 && <span class="admin__count">{s.queued_jobs}</span>}
           </a>
-          <button class="btn btn--secondary interactive" disabled={publishing} onClick={async () => {
-            setPublishing(true);
-            try {
-              const result = await api.post<{ site?: string; note?: string }>('/admin/publish');
-              alert(result.site === 'rebuilding'
-                ? 'Publish started in GitHub Actions. The public site will update in about 2 minutes.'
-                : result.note || 'GitHub Actions publishing is not configured.');
-            } catch (e) {
-              alert((e as Error).message);
-            } finally {
-              setPublishing(false);
-            }
-          }}><Icon name="share" />{publishing ? 'Starting…' : 'Publish site'}</button>
+          <button class={`btn ${pending.pending ? 'btn--primary' : 'btn--secondary'} interactive`} disabled={publishing}
+            title={pending.last_published_at ? `Last published ${pending.last_published_at} (UTC)` : 'Not published from the admin yet'}
+            onClick={async () => {
+              if (!confirm(`Rebuild the public site with all published taraney${pending.pending ? ` (${pending.pending} change${pending.pending === 1 ? '' : 's'} waiting)` : ''}?`)) return;
+              setPublishing(true);
+              try {
+                const result = await api.post<{ site?: string; note?: string }>('/admin/publish');
+                alert(result.site === 'rebuilding'
+                  ? 'Publishing on GitHub. The public site updates in about 2 minutes.'
+                  : result.note || 'GitHub Actions publishing is not configured.');
+                if (result.site === 'rebuilding') setPending({ ...pending, pending: 0 });
+              } catch (e) {
+                alert((e as Error).message);
+              } finally {
+                setPublishing(false);
+              }
+            }}><Icon name="share" />{publishing ? 'Starting…' : 'Publish site'}{pending.pending > 0 && <span class="admin__count">{pending.pending}</span>}</button>
           <a class="btn btn--primary interactive" href="#/new"><Icon name="edit" />New tarana</a>
         </div>
       </header>

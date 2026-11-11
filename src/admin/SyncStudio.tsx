@@ -8,6 +8,7 @@ import { expandSung } from '../lib/song-shape';
 import { formatTime } from '../lib/timeline';
 import { api } from './api';
 import { go, useToast } from './App';
+import { askPublish, siteNote } from './publish';
 import type { FullSong, Rec } from './SongEditor';
 
 interface Item { key: string; occ: number; section: string; line: number; ur: string; ro: string; repeat: boolean }
@@ -246,8 +247,8 @@ export default function SyncStudio({ song, rec, onSaved }: { song: FullSong; rec
       const lines = items.map((it, i) => ({ it, sp: spans[i], own: timing[it.key] }))
         .filter((x) => x.own.start != null)
         .map(({ it, own }) => ({ occ: it.occ, section: it.section, line: it.line, start_ms: own.start!, end_ms: own.end }));
-      await api.put(`/admin/recordings/${rec.id}/timing`, { lines, structure, duration_ms: duration });
-      setDirty(false); toast(`Saved ${lines.length} timed lines`); onSaved();
+      const r = await api.put<{ site?: string; note?: string }>(`/admin/recordings/${rec.id}/timing${askPublish(song.publish_state === 'published', `Saved ${lines.length} timed lines.`)}`, { lines, structure, duration_ms: duration });
+      setDirty(false); toast(...siteNote(`Saved ${lines.length} timed lines`, r)); onSaved();
     } catch (x) { toast((x as Error).message, 'err'); } finally { setSaving(false); }
   };
 

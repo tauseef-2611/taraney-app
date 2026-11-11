@@ -1,19 +1,17 @@
 # Publishes D1 content only. It intentionally skips migrations and tests.
 name: Publish content
 
+# Started only from the admin (Dashboard → Publish site, or "publish now" on a live tarana)
+# or by hand in GitHub. Ingest and ordinary edits never publish on their own.
 on:
   workflow_dispatch:
-  workflow_run:
-    workflows: ["Ingest"]
-    types: [completed]
 
 concurrency:
   group: publish-content
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   publish:
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
