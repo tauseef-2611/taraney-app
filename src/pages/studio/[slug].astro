@@ -1,0 +1,28 @@
+---
+// Reel Studio page for one tarana. Full-screen editor: no app tab bar or mini player.
+import Base from '../../layouts/Base.astro';
+import Studio, { type StudioSong } from '../../app/Studio';
+import { allSongs, primaryRec, type PubSong } from '../../data/load';
+import '../../styles/app.css'; // bottom sheet, notices and other shared app styles used by the editor
+
+export function getStaticPaths() {
+  return allSongs().map((song) => ({ params: { slug: song.slug }, props: { song } }));
+}
+const { song } = Astro.props as { song: PubSong };
+const title = `Create reel · ${song.title_ro || song.title_ur} · Taraney`;
+const studioSong: StudioSong = {
+  id: song.id, slug: song.slug, title_ur: song.title_ur, title_ro: song.title_ro, mood: song.mood, themes: song.themes,
+  poet_ro: song.poet_ro, singer: song.singer, doc: song.doc, audio: primaryRec(song),
+};
+---
+<Base title={title}>
+  <Studio client:only="preact" song={studioSong} />
+  <noscript>
+    <p class="studio-fallback">Reel Studio needs JavaScript. <a href={`/t/${song.slug}/`}>Back to the tarana</a></p>
+  </noscript>
+  <script is:inline>
+    if ('serviceWorker' in navigator && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+      navigator.serviceWorker.register('/sw.js').catch(function () {});
+    }
+  </script>
+</Base>

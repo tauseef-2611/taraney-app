@@ -120,6 +120,7 @@ export default function SongReader({ song }: { song: ReaderSong }) {
         <IconButton icon="heart" label={saved ? 'Remove from library' : 'Save to library'} variant="tonal" class={saved ? 'is-saved' : ''} aria-pressed={saved ? 'true' : 'false'}
           onClick={() => { library.toggleSave(summary); setSaved(!saved); }} />
         <IconButton icon="sparkles" label="Share couplet as status" variant="tonal" onClick={() => openShare(blocks[0].occ, 0)} />
+        <IconButton icon="video" label="Create lyric video" variant="tonal" onClick={() => location.assign(`/studio/${song.slug}/`)} />
         <IconButton icon="share" label="Share link" variant="tonal" onClick={sharePage} />
         <IconButton icon={offline === 'saved' ? 'check' : 'download'} label={offline === 'saved' ? 'Saved for offline' : 'Save for offline'} variant="tonal" aria-pressed={offline === 'saved' ? 'true' : 'false'} disabled={offline === 'saving'} onClick={saveOffline} />
       </div>
@@ -146,6 +147,7 @@ export default function SongReader({ song }: { song: ReaderSong }) {
           <div class="sheet__line">{sel.ur && <p lang="ur">{sel.ur}</p>}{sel.ro && <p class="t-body-lg c-variant">{sel.ro}</p>}</div>
           <div class="sheet__actions">
             <button class="sheet__action interactive" onClick={() => { openShare(sheet.occ, sheet.line); setSheet(null); }}><Icon name="sparkles" />Share as status image</button>
+            <a class="sheet__action interactive" href={`/studio/${song.slug}/?line=${sheet.occ}:${sheet.line}`}><Icon name="video" />Make a lyric video from here</a>
             {selCue && <button class="sheet__action interactive" onClick={() => { listen(selCue.start); setSheet(null); }}><Icon name="play" />Play from this line</button>}
             <button class="sheet__action interactive" onClick={() => { setSuggest(sheet); setSheet(null); }}><Icon name="edit" />Suggest a correction</button>
           </div>

@@ -1,0 +1,18 @@
+---
+import App from '../../layouts/App.astro';
+import StudioPicker from '../../app/StudioPicker';
+---
+<App title="Reel Studio · Taraney" tab="">
+  <div class="page page--tight">
+    <header class="page-title reveal">
+      <h1>Reel Studio</h1>
+      <p>Turn your favourite lines into a lyric video for status and reels.</p>
+    </header>
+    <ol class="studio-steps reveal" style="--i:1">
+      <li><span>1</span>Pick a tarana</li>
+      <li><span>2</span>Choose lines and a template</li>
+      <li><span>3</span>Export and share</li>
+    </ol>
+    <StudioPicker client:load />
+  </div>
+</App>

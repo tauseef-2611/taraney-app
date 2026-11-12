@@ -33,6 +33,12 @@ export const ICONS = {
   'arrow-left': S('M19 12H5M11 6l-6 6 6 6'),
   info: '<circle cx="12" cy="12" r="8.5"/>' + S('M12 11v5.5M12 7.6v.4'),
   offline: S('M3.5 3.5l17 17M8.5 16.5a5 5 0 0 1 7 0M5 13a10 10 0 0 1 5-2.7M14 10.4a10 10 0 0 1 5 2.6M2 9.5a15 15 0 0 1 5.3-3.1M12 18.5h.01'),
+  image: S('M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5z') + '<circle cx="9" cy="9.5" r="1.6"/>' + S('M4.5 17 9 12.5l3.5 3.5 2.5-2.5 4.5 4.5'),
+  type: S('M5 6V4.5h14V6M12 4.5v15M9 19.5h6'),
+  layers: S('M12 3.5 21 8l-9 4.5L3 8z') + S('M3 12.5l9 4.5 9-4.5') + S('M3 16.5l9 4.5 9-4.5'),
+  ratio: '<rect x="7" y="3.5" width="10" height="17" rx="2.5"/>',
+  reset: S('M4.5 12a7.5 7.5 0 1 0 2.2-5.3M4.5 4.5V9h4.5'),
+  upload: S('M12 15.5v-11M8 8.5l4-4 4 4M5 19.5h14'),
 } as const;
 
 export type IconName = keyof typeof ICONS;
