@@ -22,8 +22,10 @@ export interface Clip { lines: StudioLine[]; duration: number; audioStartMs: num
 export type BgKind = 'aurora' | 'stars' | 'rain' | 'rays' | 'bokeh' | 'paper' | 'pattern' | 'embers' | 'clouds' | 'plain';
 /** focus: one line at a time. couplet: current line + its partner. scroll: karaoke list, active line centred. stack: lines of a couplet appear one by one and stay. */
 export type TextLayout = 'focus' | 'couplet' | 'scroll' | 'stack';
-export type TextAnim = 'fade' | 'rise' | 'zoom' | 'blur' | 'wipe';
+export type TextAnim = 'fade' | 'rise' | 'zoom' | 'blur' | 'wipe' | 'word-rise' | 'word-karaoke' | 'drift';
 export type FrameKind = 'none' | 'border' | 'corners' | 'bar';
+export type FontStyle = 'default' | 'serif' | 'sans' | 'nastaliq' | 'mono';
+export type WordSplit = 'full' | 'chunk2' | 'chunk3';
 
 export interface Template {
   id: string;
@@ -41,6 +43,10 @@ export interface Template {
   layout: TextLayout;
   anim: TextAnim;
   frame: FrameKind;
+  defaultScript?: Script;
+  fontStyle?: FontStyle;
+  defaultScale?: number;
+  suggestedVideoId?: string;
 }
 
 export type TextPosition = 'top' | 'center' | 'bottom';
@@ -57,7 +63,7 @@ export interface Project {
   showTitle: boolean;
   showBrand: boolean;
   showProgress: boolean;
-  /** 0.7 to 1.4, multiplies lyric font sizes. */
+  /** 0.4 to 1.4, multiplies lyric font sizes. */
   textScale: number;
   position: TextPosition;
   /** Optional user photo that replaces the painted background (drawn cover-fit, then darkened by imageDim 0..1). */
@@ -65,6 +71,8 @@ export interface Project {
   imageDim: number;
   /** Stable seed (song id) so particles and angles are deterministic. */
   seed: string;
+  fontStyle?: FontStyle;
+  animOverride?: TextAnim;
 }
 
 export interface ExportResult { blob: Blob; ext: 'mp4' | 'webm'; mime: string }

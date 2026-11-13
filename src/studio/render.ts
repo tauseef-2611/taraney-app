@@ -1,10 +1,38 @@
 // Reel Studio frame renderer. drawFrame is a pure function of (project, clip time) so the preview
 // and the exporter draw identical frames. Font loading and text measurement follow share-card.ts.
-import { FORMATS, type FormatKey, type FrameKind, type Project, type Script, type StudioLine, type TextAnim, type TextPosition } from './types';
+import { FORMATS, type FontStyle, type FormatKey, type FrameKind, type Project, type Script, type StudioLine, type TextAnim, type TextPosition } from './types';
 import { paintBackground } from './backgrounds';
 
-const URDU = "'Gulzar', 'Noto Nastaliq Urdu', serif";
-const SANS = "'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif";
+export const FONTS: Record<FontStyle, { ur: string; ro: string; label: string }> = {
+  default: {
+    ur: "'Gulzar', 'Noto Nastaliq Urdu', serif",
+    ro: "'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif",
+    label: 'Standard',
+  },
+  serif: {
+    ur: "'Gulzar', 'Noto Nastaliq Urdu', serif",
+    ro: "'Cormorant Garamond', 'Playfair Display', Georgia, serif",
+    label: 'Cinematic Serif',
+  },
+  sans: {
+    ur: "'Gulzar', 'Noto Sans Arabic', system-ui, sans-serif",
+    ro: "'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif",
+    label: 'Modern Sans',
+  },
+  nastaliq: {
+    ur: "'Gulzar', 'Noto Nastaliq Urdu', serif",
+    ro: "'Cormorant Garamond', Georgia, serif",
+    label: 'Pure Nastaliq',
+  },
+  mono: {
+    ur: "'Gulzar', 'Noto Nastaliq Urdu', monospace",
+    ro: "'Courier Prime', 'Courier New', monospace",
+    label: 'Typewriter Mono',
+  },
+};
+
+const URDU = FONTS.default.ur;
+const SANS = FONTS.default.ro;
 const FORMAT_FACTOR: Record<FormatKey, number> = { reel: 1, square: 0.85, wide: 0.8 };
 const ANCHOR: Record<TextPosition, number> = { top: 0.3, center: 0.47, bottom: 0.66 };
 const TEXT_W = 0.82; // lyric block width: canvas width minus 2 x 0.09w padding
@@ -16,10 +44,18 @@ const CACHE_LIMIT = 5000;
 /** Loads the canvas fonts so the first frames are not drawn with fallbacks. */
 export async function ensureStudioFonts(): Promise<void> {
   if (typeof document === 'undefined' || !document.fonts) return;
+  if (!document.getElementById('studio-google-fonts')) {
+    const link = document.createElement('link');
+    link.id = 'studio-google-fonts';
+    link.rel = 'stylesheet';
+    link.href = 'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Noto+Nastaliq+Urdu:wght@400;600&family=Playfair+Display:ital,wght@0,500;1,400&family=Courier+Prime:ital,wght@0,400;0,700&display=swap';
+    document.head.appendChild(link);
+  }
   await Promise.all([
     document.fonts.load(`400 64px ${URDU}`, 'ترانے عزم'),
     document.fonts.load(`600 32px ${SANS}`, 'Taraney'),
     document.fonts.load(`400 32px ${SANS}`, 'Taraney'),
+    document.fonts.load(`400 36px 'Cormorant Garamond', Georgia, serif`, 'Taraney Roman'),
   ]).catch(() => {});
 }
 
@@ -130,12 +166,17 @@ interface Piece {
   sc: number;
   dy: number;
   divider: boolean;
+  lineStart: number;
+  lineEnd: number;
+  t: number;
 }
 interface Plan { pieces: Piece[]; topY: number }
 interface Ctx { g: CanvasRenderingContext2D; p: Project; t: number; w: number; h: number; k: number; maxW: number; cy: number }
 
-const fontOf = (sg: { ur: boolean; weight: number }, size: number) =>
-  sg.ur ? `400 ${size}px ${URDU}` : `${sg.weight} ${size}px ${SANS}`;
+const fontOf = (sg: { ur: boolean; weight: number }, size: number, fontStyle: FontStyle = 'default') => {
+  const pair = FONTS[fontStyle] ?? FONTS.default;
+  return sg.ur ? `400 ${size}px ${pair.ur}` : `${sg.weight} ${size}px ${pair.ro}`;
+};
 
 /** Picks which script runs to show for a line, falling back to the other script when one is empty. */
 function segsFor(line: StudioLine, script: Script, k: number): Seg[] {
@@ -159,9 +200,9 @@ function segsFor(line: StudioLine, script: Script, k: number): Seg[] {
 }
 
 /** One shared shrink factor (1 down to 0.7) so every line in the group fits; wrapping happens at 0.7. */
-function pickScale(g: CanvasRenderingContext2D, group: Seg[][], maxW: number): number {
+function pickScale(g: CanvasRenderingContext2D, group: Seg[][], maxW: number, fontStyle: FontStyle = 'default'): number {
   const fits = (s: number) =>
-    group.every((segs) => segs.every((sg) => measureW(g, fontOf(sg, Math.round(sg.base * s)), sg.text) <= maxW));
+    group.every((segs) => segs.every((sg) => measureW(g, fontOf(sg, Math.round(sg.base * s), fontStyle), sg.text) <= maxW));
   if (fits(1)) return 1;
   for (let s = 0.98; s > MIN_SHRINK + 1e-6; s -= 0.02) {
     if (fits(s)) return s;
@@ -169,13 +210,13 @@ function pickScale(g: CanvasRenderingContext2D, group: Seg[][], maxW: number): n
   return MIN_SHRINK;
 }
 
-function buildLaid(g: CanvasRenderingContext2D, segs: Seg[], s: number, maxW: number, k: number): Laid {
+function buildLaid(g: CanvasRenderingContext2D, segs: Seg[], s: number, maxW: number, k: number, fontStyle: FontStyle = 'default'): Laid {
   const gap = segs.length > 1 ? Math.round(36 * k * s) : 0;
   const out: LaidSeg[] = [];
   let top = 0;
   for (const sg of segs) {
     const size = Math.round(sg.base * s);
-    const font = fontOf(sg, size);
+    const font = fontOf(sg, size, fontStyle);
     const lh = sg.ur ? size * 2.1 : size * 1.5;
     const lines = wrapText(g, sg.text, font, maxW);
     out.push({ ur: sg.ur, font, lh, lines, top, h: lines.length * lh });
@@ -186,13 +227,13 @@ function buildLaid(g: CanvasRenderingContext2D, segs: Seg[], s: number, maxW: nu
   return { segs: out, h, dividerAt: gap && first ? first.h + gap / 2 : null };
 }
 
-function layoutLines(g: CanvasRenderingContext2D, group: Seg[][], maxW: number, k: number): Laid[] {
-  const s = pickScale(g, group, maxW);
-  return group.map((segs) => buildLaid(g, segs, s, maxW, k));
+function layoutLines(g: CanvasRenderingContext2D, group: Seg[][], maxW: number, k: number, fontStyle: FontStyle = 'default'): Laid[] {
+  const s = pickScale(g, group, maxW, fontStyle);
+  return group.map((segs) => buildLaid(g, segs, s, maxW, k, fontStyle));
 }
 
-function layoutLine(g: CanvasRenderingContext2D, segs: Seg[], maxW: number, k: number): Laid {
-  return buildLaid(g, segs, pickScale(g, [segs], maxW), maxW, k);
+function layoutLine(g: CanvasRenderingContext2D, segs: Seg[], maxW: number, k: number, fontStyle: FontStyle = 'default'): Laid {
+  return buildLaid(g, segs, pickScale(g, [segs], maxW, fontStyle), maxW, k, fontStyle);
 }
 
 // ---------- layouts ----------
@@ -200,17 +241,20 @@ function layoutLine(g: CanvasRenderingContext2D, segs: Seg[], maxW: number, k: n
 /** focus: one line, animated in on its start and out before the next line. */
 function planFocus(c: Ctx, i: number): Plan {
   const { p, t } = c;
+  const fontStyle = p.fontStyle || p.template.fontStyle || 'default';
+  const anim = p.animOverride || p.template.anim;
   const line: StudioLine | undefined = p.lines[i];
   const next: StudioLine | undefined = p.lines[i + 1];
   if (!line) return { pieces: [], topY: c.cy };
   const boundary = next ? Math.min(next.start, line.end) : line.end;
   const alpha = exitAlpha(t, boundary);
   if (alpha <= 0) return { pieces: [], topY: c.cy };
-  const laid = layoutLine(c.g, segsFor(line, p.script, c.k), c.maxW, c.k);
+  const laid = layoutLine(c.g, segsFor(line, p.script, c.k), c.maxW, c.k, fontStyle);
   return {
     pieces: [{
-      laid, cy: c.cy, color: p.template.text, alpha, anim: p.template.anim,
+      laid, cy: c.cy, color: p.template.text, alpha, anim,
       e: enterE(t, line.start), sc: 1, dy: 0, divider: laid.dividerAt !== null,
+      lineStart: line.start, lineEnd: boundary, t,
     }],
     topY: c.cy - laid.h / 2,
   };
@@ -219,6 +263,8 @@ function planFocus(c: Ctx, i: number): Plan {
 /** couplet: the active pair, both lines shown. stack: the second line appears at its own start and stays. */
 function planPairs(c: Ctx, i: number, stack: boolean): Plan {
   const { p, t } = c;
+  const fontStyle = p.fontStyle || p.template.fontStyle || 'default';
+  const anim = p.animOverride || p.template.anim;
   const { text, dim } = p.template;
   const lines = p.lines;
   const a0 = Math.floor(i / 2) * 2;
@@ -233,7 +279,7 @@ function planPairs(c: Ctx, i: number, stack: boolean): Plan {
 
   const group: Seg[][] = [segsFor(a, p.script, c.k)];
   if (b) group.push(segsFor(b, p.script, c.k));
-  const laid = layoutLines(c.g, group, c.maxW, c.k);
+  const laid = layoutLines(c.g, group, c.maxW, c.k, fontStyle);
   const gap = Math.round(36 * c.k);
   const total = laid.reduce((s, l) => s + l.h, 0) + gap * (laid.length - 1);
   let top = c.cy - total / 2;
@@ -251,9 +297,10 @@ function planPairs(c: Ctx, i: number, stack: boolean): Plan {
       ? (j === 0 && i === a0 + 1 ? dim : text)
       : (idx === i ? text : dim);
     pieces.push({
-      laid: l, cy, color, alpha, anim: p.template.anim,
+      laid: l, cy, color, alpha, anim,
       e: enterE(t, stack && j === 1 ? line.start : a.start),
       sc: 1, dy: 0, divider: false,
+      lineStart: line.start, lineEnd: boundary, t,
     });
   });
   return { pieces, topY };
@@ -262,8 +309,9 @@ function planPairs(c: Ctx, i: number, stack: boolean): Plan {
 /** scroll: karaoke list. Active line centred at the anchor, the list eases between lines. */
 function planScroll(c: Ctx, i: number): Plan {
   const { p, t } = c;
+  const fontStyle = p.fontStyle || p.template.fontStyle || 'default';
   const lines = p.lines;
-  const laid = lines.map((l) => layoutLine(c.g, segsFor(l, p.script, c.k), c.maxW, c.k));
+  const laid = lines.map((l) => layoutLine(c.g, segsFor(l, p.script, c.k), c.maxW, c.k, fontStyle));
   const gap = Math.round(36 * c.k);
   const centres: number[] = [];
   let y = 0;
@@ -291,6 +339,7 @@ function planScroll(c: Ctx, i: number): Plan {
     pieces.push({
       laid: l, cy: cyAbs, color: active ? text : dim, alpha, anim: 'fade',
       e: 1, sc: active ? 1 : 0.72, dy: 0, divider: false,
+      lineStart: cur?.start ?? 0, lineEnd: cur?.end ?? 0, t,
     });
   });
   const act = Math.max(i, 0);
@@ -325,6 +374,11 @@ function drawPiece(g: CanvasRenderingContext2D, pc: Piece, w: number, u: number,
   } else if (pc.anim === 'zoom') {
     alpha *= e;
     sc *= 0.92 + 0.08 * e;
+  } else if (pc.anim === 'drift') {
+    alpha *= e;
+    const dur = Math.max(1000, pc.lineEnd - pc.lineStart);
+    const progress = clamp01((pc.t - pc.lineStart) / dur);
+    dy += Math.sin(progress * Math.PI) * (-12 * u);
   }
   if (alpha <= 0.001) return;
 
@@ -343,6 +397,8 @@ function drawPiece(g: CanvasRenderingContext2D, pc: Piece, w: number, u: number,
     g.restore();
   }
 
+  const isWordAnim = pc.anim === 'word-karaoke' || pc.anim === 'word-rise';
+
   for (const seg of pc.laid.segs) {
     const y = top + seg.top;
     g.save();
@@ -357,10 +413,88 @@ function drawPiece(g: CanvasRenderingContext2D, pc: Piece, w: number, u: number,
     else setShadow(g, dark, 24 * u);
     g.direction = seg.ur ? 'rtl' : 'ltr';
     g.font = seg.font;
-    g.fillStyle = pc.color;
-    g.textAlign = 'center';
     g.textBaseline = 'middle';
-    seg.lines.forEach((ln, j) => g.fillText(ln, w / 2, y + j * seg.lh + seg.lh / 2));
+
+    if (!isWordAnim) {
+      g.fillStyle = pc.color;
+      g.textAlign = 'center';
+      seg.lines.forEach((ln, j) => g.fillText(ln, w / 2, y + j * seg.lh + seg.lh / 2));
+    } else {
+      const dur = Math.max(1000, pc.lineEnd - pc.lineStart);
+      const allWords = seg.lines.flatMap((ln) => ln.split(' ').filter(Boolean));
+      const totalWords = Math.max(1, allWords.length);
+      let wordCounter = 0;
+      const spaceW = measureW(g, seg.font, ' ');
+
+      seg.lines.forEach((ln, j) => {
+        const lineWords = ln.split(' ').filter(Boolean);
+        if (!lineWords.length) return;
+        const lineY = y + j * seg.lh + seg.lh / 2;
+        const wordWidths = lineWords.map((wd) => measureW(g, seg.font, wd));
+        const totalLineWidth = wordWidths.reduce((a, b) => a + b, 0) + (lineWords.length - 1) * spaceW;
+
+        if (seg.ur) {
+          let curX = w / 2 + totalLineWidth / 2;
+          g.textAlign = 'right';
+
+          lineWords.forEach((word, wi) => {
+            const wIdx = wordCounter++;
+            const wordCue = pc.lineStart + (wIdx / totalWords) * dur * 0.85;
+            const wordW = wordWidths[wi];
+
+            if (pc.anim === 'word-karaoke') {
+              const active = pc.t >= wordCue;
+              g.save();
+              g.fillStyle = active ? pc.color : 'rgba(255,255,255,0.32)';
+              if (active) setShadow(g, true, 28 * u, accent);
+              g.fillText(word, curX, lineY);
+              g.restore();
+            } else if (pc.anim === 'word-rise') {
+              const wE = easeOutCubic(clamp01((pc.t - wordCue) / 300));
+              if (wE > 0.01) {
+                g.save();
+                g.globalAlpha = Math.min(1, alpha * wE);
+                const wDy = (1 - wE) * 20 * u;
+                g.fillStyle = pc.color;
+                g.fillText(word, curX, lineY + wDy);
+                g.restore();
+              }
+            }
+            curX -= (wordW + spaceW);
+          });
+        } else {
+          let curX = w / 2 - totalLineWidth / 2;
+          g.textAlign = 'left';
+
+          lineWords.forEach((word, wi) => {
+            const wIdx = wordCounter++;
+            const wordCue = pc.lineStart + (wIdx / totalWords) * dur * 0.85;
+            const wordW = wordWidths[wi];
+
+            if (pc.anim === 'word-karaoke') {
+              const active = pc.t >= wordCue;
+              g.save();
+              g.fillStyle = active ? pc.color : 'rgba(255,255,255,0.32)';
+              if (active) setShadow(g, true, 28 * u, accent);
+              g.fillText(word, curX, lineY);
+              g.restore();
+            } else if (pc.anim === 'word-rise') {
+              const wE = easeOutCubic(clamp01((pc.t - wordCue) / 300));
+              if (wE > 0.01) {
+                g.save();
+                g.globalAlpha = Math.min(1, alpha * wE);
+                const wDy = (1 - wE) * 20 * u;
+                g.fillStyle = pc.color;
+                g.fillText(word, curX, lineY + wDy);
+                g.restore();
+              }
+            }
+            curX += (wordW + spaceW);
+          });
+        }
+      });
+    }
+
     g.restore();
   }
   g.restore();
@@ -393,8 +527,9 @@ function drawDeco(g: CanvasRenderingContext2D, frame: FrameKind, w: number, h: n
   g.restore();
 }
 
-function drawLabel(g: CanvasRenderingContext2D, text: string, ur: boolean, size: number, weight: number, y: number, maxW: number, w: number): void {
-  const font = ur ? `400 ${size}px ${URDU}` : `${weight} ${size}px ${SANS}`;
+function drawLabel(g: CanvasRenderingContext2D, text: string, ur: boolean, size: number, weight: number, y: number, maxW: number, w: number, fontStyle: FontStyle = 'default'): void {
+  const pair = FONTS[fontStyle] ?? FONTS.default;
+  const font = ur ? `400 ${size}px ${pair.ur}` : `${weight} ${size}px ${pair.ro}`;
   const shown = fitText(g, text, font, maxW);
   g.direction = ur ? 'rtl' : 'ltr';
   g.font = font;
@@ -402,6 +537,7 @@ function drawLabel(g: CanvasRenderingContext2D, text: string, ur: boolean, size:
 }
 
 function drawTitle(g: CanvasRenderingContext2D, p: Project, w: number, h: number, u: number, dark: boolean): void {
+  const fontStyle = p.fontStyle || p.template.fontStyle || 'default';
   const maxW = w * 0.8;
   const title = p.title.trim();
   const sub = p.subtitle.trim();
@@ -413,20 +549,22 @@ function drawTitle(g: CanvasRenderingContext2D, p: Project, w: number, h: number
   setShadow(g, dark, 12 * u);
   if (title) {
     const ur = URDU_RE.test(title);
-    drawLabel(g, title, ur, ur ? 50 * u : 40 * u, 600, y, maxW, w);
+    drawLabel(g, title, ur, ur ? 50 * u : 40 * u, 600, y, maxW, w, fontStyle);
     y += ur ? 60 * u : 46 * u;
   }
   if (sub) {
     g.globalAlpha = 0.75;
-    drawLabel(g, sub, URDU_RE.test(sub), 28 * u, 400, y, maxW, w);
+    drawLabel(g, sub, URDU_RE.test(sub), 28 * u, 400, y, maxW, w, fontStyle);
   }
   g.restore();
 }
 
 function drawBrand(g: CanvasRenderingContext2D, p: Project, w: number, h: number, u: number, dark: boolean): void {
+  const fontStyle = p.fontStyle || p.template.fontStyle || 'default';
+  const pair = FONTS[fontStyle] ?? FONTS.default;
   const fs = 30 * u;
-  const urduFont = `400 ${Math.round(fs * 1.25)}px ${URDU}`;
-  const sansFont = `600 ${fs}px ${SANS}`;
+  const urduFont = `400 ${Math.round(fs * 1.25)}px ${pair.ur}`;
+  const sansFont = `600 ${fs}px ${pair.ro}`;
   const y = h - 0.05 * h;
   g.save();
   g.direction = 'rtl';

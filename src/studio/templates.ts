@@ -10,6 +10,7 @@ export const TEMPLATES: Template[] = [
     bg: 'aurora', colors: ['#0B2A2E', '#1E5C60', '#8FC9C4'],
     text: '#F4FBFA', accent: '#9FD8D0', dim: 'rgba(244,251,250,0.45)',
     layout: 'focus', anim: 'fade', frame: 'none',
+    suggestedVideoId: 'autumn-mist',
   },
   {
     id: 'still-water', name: 'Still Water', mood: 'sukoon', themes: ['tawheed'],
@@ -22,12 +23,22 @@ export const TEMPLATES: Template[] = [
     bg: 'stars', colors: ['#041A24', '#0B3345', '#2F7A8C'],
     text: '#EAF6F8', accent: '#8ED8E6', dim: 'rgba(234,246,248,0.45)',
     layout: 'couplet', anim: 'blur', frame: 'corners',
+    suggestedVideoId: 'spiritual-dusk',
   },
   {
     id: 'silver-dawn', name: 'Silver Dawn', mood: 'sukoon', themes: ['tawakkul'],
     bg: 'clouds', colors: ['#7FB8B4', '#B9DEDA', '#EAF7F5'],
     text: '#1F2A2C', accent: '#2E7D78', dim: 'rgba(31,42,44,0.45)',
     layout: 'couplet', anim: 'fade', frame: 'border',
+    suggestedVideoId: 'misty-woods',
+  },
+  {
+    id: 'khat-e-nastaliq', name: 'Khat-e-Nastaliq', mood: 'sukoon', themes: ['tawheed', 'tawakkul', 'ishq-e-rasool'],
+    bg: 'plain', colors: ['#060B0A', '#0D1A16', '#1D3B32'],
+    text: '#FFFDF5', accent: '#D4AF37', dim: 'rgba(255,253,245,0.40)',
+    layout: 'couplet', anim: 'fade', frame: 'border',
+    defaultScript: 'ur', fontStyle: 'nastaliq', defaultScale: 0.85,
+    suggestedVideoId: 'sunlight-mist',
   },
 
   // aqeedat: amber lamplight and emerald
@@ -81,6 +92,14 @@ export const TEMPLATES: Template[] = [
     text: '#FFFFFF', accent: '#FFD56B', dim: 'rgba(255,255,255,0.45)',
     layout: 'stack', anim: 'wipe', frame: 'none',
   },
+  {
+    id: 'golden-embers', name: 'Golden Embers', mood: 'josh', themes: ['himmat', 'bedari', 'ittehad'],
+    bg: 'embers', colors: ['#120803', '#2B1408', '#6E3214'],
+    text: '#FFF8F0', accent: '#FFB347', dim: 'rgba(255,248,240,0.40)',
+    layout: 'focus', anim: 'word-rise', frame: 'corners',
+    defaultScript: 'ur', fontStyle: 'nastaliq', defaultScale: 0.9,
+    suggestedVideoId: 'sunlight-mist',
+  },
 
   // fikr: deep indigo night sky, ink and old paper
   {
@@ -88,6 +107,7 @@ export const TEMPLATES: Template[] = [
     bg: 'stars', colors: ['#070A1F', '#1A1F4F', '#4A4FA8'],
     text: '#EEF0FF', accent: '#B8BEFF', dim: 'rgba(238,240,255,0.45)',
     layout: 'focus', anim: 'fade', frame: 'border',
+    suggestedVideoId: 'dark-river',
   },
   {
     id: 'ink-wash', name: 'Ink Wash', mood: 'fikr', themes: ['tareekh', 'khudi'],
@@ -107,19 +127,45 @@ export const TEMPLATES: Template[] = [
     text: '#F5F6FF', accent: '#A9B2FF', dim: 'rgba(245,246,255,0.45)',
     layout: 'scroll', anim: 'zoom', frame: 'corners',
   },
+  {
+    id: 'nocturne-bokeh', name: 'Nocturne Bokeh', mood: 'fikr', themes: ['khudi', 'akhirat'],
+    bg: 'bokeh', colors: ['#080C14', '#141E30', '#324765'],
+    text: '#F4F7FC', accent: '#E5C07B', dim: 'rgba(244,247,252,0.35)',
+    layout: 'focus', anim: 'word-karaoke', frame: 'none',
+    defaultScript: 'ro', fontStyle: 'serif', defaultScale: 0.8,
+    suggestedVideoId: 'dark-river',
+  },
+  {
+    id: 'micro-quote', name: 'Micro Quote', mood: 'fikr', themes: ['khudi', 'tareekh', 'akhirat'],
+    bg: 'plain', colors: ['#050505', '#0F0F10', '#1C1D1F'],
+    text: '#FFFFFF', accent: '#A0A5AD', dim: 'rgba(255,255,255,0.30)',
+    layout: 'focus', anim: 'fade', frame: 'none',
+    defaultScript: 'both', fontStyle: 'sans', defaultScale: 0.55,
+    suggestedVideoId: 'coastal-clouds',
+  },
 
   // gham: olive dusk and rain on glass
+  {
+    id: 'cinematic-rain', name: 'Cinematic Rain', mood: 'gham', themes: ['falasteen', 'burma', 'istemar', 'khudi'],
+    bg: 'rain', colors: ['#0A0F14', '#15222E', '#3D5A73'],
+    text: '#F0F6FC', accent: '#58A6FF', dim: 'rgba(240,246,252,0.35)',
+    layout: 'focus', anim: 'blur', frame: 'bar',
+    defaultScript: 'ro', fontStyle: 'serif', defaultScale: 0.8,
+    suggestedVideoId: 'rain-glass',
+  },
   {
     id: 'olive-rain', name: 'Olive Rain', mood: 'gham', themes: ['falasteen', 'burma'],
     bg: 'rain', colors: ['#14170F', '#3A4128', '#7C8561'],
     text: '#EEF0E6', accent: '#B9C29A', dim: 'rgba(238,240,230,0.45)',
     layout: 'focus', anim: 'fade', frame: 'bar',
+    suggestedVideoId: 'foggy-rain',
   },
   {
     id: 'rain-on-glass', name: 'Rain on Glass', mood: 'gham', themes: ['adl-o-insaf', 'istemar'],
     bg: 'rain', colors: ['#101314', '#2C3436', '#6D7B80'],
     text: '#E6ECEE', accent: '#9FB4BA', dim: 'rgba(230,236,238,0.45)',
     layout: 'couplet', anim: 'blur', frame: 'border',
+    suggestedVideoId: 'rain-glass',
   },
   {
     id: 'dusk-olive', name: 'Dusk Olive', mood: 'gham', themes: ['falasteen'],

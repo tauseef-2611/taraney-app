@@ -7,10 +7,11 @@ import { Icon, type IconName } from '../components/ui/Icon';
 import { Button, Chip, IconButton, Progress } from '../components/ui/controls';
 import { Sheet } from './ShareSheet';
 import { player } from './store';
-import { FORMATS, type Clip, type ExportResult, type FormatKey, type Project, type Script, type Template, type TextPosition } from '../studio/types';
+import { FORMATS, type Clip, type ExportResult, type FontStyle, type FormatKey, type Project, type Script, type Template, type TextAnim, type TextPosition, type WordSplit } from '../studio/types';
 import { DEFAULT_TEMPLATE_ID, TEMPLATES, TEMPLATE_BY_ID, recommendedTemplates, templatesForMood } from '../studio/templates';
 import { activeIndex, drawFrame, ensureStudioFonts } from '../studio/render';
-import { MAX_CLIP_MS, buildClip, defaultRange, flattenSong } from '../studio/clip';
+import { MAX_CLIP_MS, buildClip, chunkStudioLines, defaultRange, flattenSong } from '../studio/clip';
+import { STOCK_VIDEOS, STOCK_VIDEO_BY_ID, type StockVideo } from '../studio/stock-videos';
 import { canExport, exportVideo, saveVideo, shareOrSaveVideo } from '../studio/export';
 import { MOODS, MOOD_LABELS, type Mood } from '../lib/mood';
 import { scriptsOf } from '../lib/song-shape';
@@ -67,18 +68,24 @@ export default function Studio({ song }: { song: StudioSong }) {
   }, [flat]);
 
   // Editor state
-  const [templateId, setTemplateId] = useState(() => recommendedTemplates(song.mood, song.themes)[0]?.id ?? DEFAULT_TEMPLATE_ID);
+  const initialTpl = useMemo(() => recommendedTemplates(song.mood, song.themes)[0] ?? TEMPLATES[0], [song]);
+  const [templateId, setTemplateId] = useState(() => initialTpl.id);
   const [format, setFormat] = useState<FormatKey>('reel');
-  const [script, setScript] = useState<Script>(bilingual ? 'both' : scripts.ur ? 'ur' : 'ro');
+  const [script, setScript] = useState<Script>(() => initialTpl.defaultScript ?? (bilingual ? 'both' : scripts.ur ? 'ur' : 'ro'));
+  const [fontStyle, setFontStyle] = useState<FontStyle>(() => initialTpl.fontStyle ?? 'default');
+  const [animOverride, setAnimOverride] = useState<TextAnim | 'default'>('default');
+  const [wordSplit, setWordSplit] = useState<WordSplit>('full');
   const [range, setRange] = useState<[number, number]>(() => defaultRange(flat, startIndex));
   const [secPerLine, setSecPerLine] = useState(3.5);
   const [useAudio, setUseAudio] = useState(!!audioUrl);
-  const [textScale, setTextScale] = useState(1);
+  const [textScale, setTextScale] = useState(() => initialTpl.defaultScale ?? 1);
   const [position, setPosition] = useState<TextPosition>('center');
   const [showTitle, setShowTitle] = useState(true);
   const [showBrand, setShowBrand] = useState(true);
   const [showProgress, setShowProgress] = useState(false);
-  const [image, setImage] = useState<HTMLImageElement | null>(null);
+  const [image, setImage] = useState<CanvasImageSource | null>(null);
+  const [isVideoMedia, setIsVideoMedia] = useState(false);
+  const [selectedStockId, setSelectedStockId] = useState<string | null>(() => initialTpl.suggestedVideoId ?? null);
   const [imageDim, setImageDim] = useState(0.45);
   const [tool, setTool] = useState<Tool>('templates');
   const [tplMood, setTplMood] = useState<Mood | 'rec'>('rec');
@@ -100,13 +107,68 @@ export default function Studio({ song }: { song: StudioSong }) {
   const [exportErr, setExportErr] = useState('');
 
   const [from, to] = range;
-  const clip: Clip = useMemo(() => buildClip(flat, from, to, secPerLine), [flat, from, to, secPerLine]);
+  const rawClip: Clip = useMemo(() => buildClip(flat, from, to, secPerLine), [flat, from, to, secPerLine]);
+  const clip: Clip = useMemo(() => {
+    if (wordSplit === 'chunk2') {
+      return { ...rawClip, lines: chunkStudioLines(rawClip.lines, 2) };
+    }
+    if (wordSplit === 'chunk3') {
+      return { ...rawClip, lines: chunkStudioLines(rawClip.lines, 3) };
+    }
+    return rawClip;
+  }, [rawClip, wordSplit]);
   const template: Template = TEMPLATE_BY_ID[templateId] ?? TEMPLATES[0];
+
+  const applyStockVideo = (v: StockVideo) => {
+    const vid = document.createElement('video');
+    vid.crossOrigin = 'anonymous';
+    vid.playsInline = true;
+    vid.muted = true;
+    vid.loop = true;
+    vid.autoplay = true;
+    vid.preload = 'auto';
+    vid.onloadeddata = () => {
+      if (imgUrlRef.current) URL.revokeObjectURL(imgUrlRef.current);
+      imgUrlRef.current = null;
+      vid.play().catch(() => {});
+      setImage(vid);
+      setIsVideoMedia(true);
+      setImageDim(v.defaultDim);
+      setSelectedStockId(v.id);
+      setNotice(`Background video: ${v.title}`);
+    };
+    vid.onerror = () => {
+      if (vid.src !== v.fallbackUrl) {
+        vid.src = v.fallbackUrl;
+      } else {
+        setNotice('Could not stream that background video.');
+      }
+    };
+    vid.src = `/api/media/${v.r2Key}`;
+  };
+
+  const selectTemplate = (t: Template) => {
+    setTemplateId(t.id);
+    if (t.defaultScript && bilingual) setScript(t.defaultScript);
+    if (t.fontStyle) setFontStyle(t.fontStyle);
+    if (t.defaultScale) setTextScale(t.defaultScale);
+    if (t.suggestedVideoId && STOCK_VIDEO_BY_ID[t.suggestedVideoId]) {
+      applyStockVideo(STOCK_VIDEO_BY_ID[t.suggestedVideoId]);
+    }
+  };
+
+  useEffect(() => {
+    if (initialTpl.suggestedVideoId && STOCK_VIDEO_BY_ID[initialTpl.suggestedVideoId]) {
+      applyStockVideo(STOCK_VIDEO_BY_ID[initialTpl.suggestedVideoId]);
+    }
+  }, []);
 
   const base = useMemo<Omit<Project, 'template' | 'format'>>(() => ({
     script, lines: clip.lines, duration: clip.duration, title, subtitle, showTitle, showBrand, showProgress,
     textScale, position, image, imageDim, seed: song.id,
-  }), [script, clip, title, subtitle, showTitle, showBrand, showProgress, textScale, position, image, imageDim, song.id]);
+    fontStyle,
+    animOverride: animOverride === 'default' ? undefined : animOverride,
+  }), [script, clip, title, subtitle, showTitle, showBrand, showProgress, textScale, position, image, imageDim, song.id, fontStyle, animOverride]);
   const project: Project = useMemo(() => ({ ...base, template, format }), [base, template, format]);
 
   // Refs read by the frame loop, so it never needs re-subscribing.
@@ -310,24 +372,51 @@ export default function Studio({ song }: { song: StudioSong }) {
 
   const resetRange = () => { setNotice(''); setRange(defaultRange(flat, startIndex)); };
 
-  const onPhoto = (input: HTMLInputElement) => {
+  const onMedia = (input: HTMLInputElement) => {
     const file = input.files?.[0];
     input.value = '';
     if (!file) return;
     const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      if (imgUrlRef.current) URL.revokeObjectURL(imgUrlRef.current);
-      imgUrlRef.current = url;
-      setImage(img);
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); setNotice('That photo could not be opened.'); };
-    img.src = url;
+    const isVid = file.type.startsWith('video/') || /\.(mp4|webm|mov)$/i.test(file.name);
+
+    if (isVid) {
+      const vid = document.createElement('video');
+      vid.crossOrigin = 'anonymous';
+      vid.playsInline = true;
+      vid.muted = true;
+      vid.loop = true;
+      vid.autoplay = true;
+      vid.onloadeddata = () => {
+        if (imgUrlRef.current) URL.revokeObjectURL(imgUrlRef.current);
+        imgUrlRef.current = url;
+        vid.play().catch(() => {});
+        setImage(vid);
+        setIsVideoMedia(true);
+        setSelectedStockId(null);
+        setNotice('Video background added');
+      };
+      vid.onerror = () => { URL.revokeObjectURL(url); setNotice('That video could not be opened.'); };
+      vid.src = url;
+    } else {
+      const img = new Image();
+      img.onload = () => {
+        if (imgUrlRef.current) URL.revokeObjectURL(imgUrlRef.current);
+        imgUrlRef.current = url;
+        setImage(img);
+        setIsVideoMedia(false);
+        setSelectedStockId(null);
+        setNotice('Photo added');
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); setNotice('That photo could not be opened.'); };
+      img.src = url;
+    }
   };
-  const removePhoto = () => {
+  const removeMedia = () => {
     if (imgUrlRef.current) URL.revokeObjectURL(imgUrlRef.current);
     imgUrlRef.current = null;
     setImage(null);
+    setIsVideoMedia(false);
+    setSelectedStockId(null);
   };
 
   const openExport = () => { setPlay(false); setExportOpen(true); };
@@ -440,7 +529,7 @@ export default function Studio({ song }: { song: StudioSong }) {
                 <div class="studio__thumbs">
                   {shownTemplates.map((t) => (
                     <button type="button" key={t.id} class={`studio__thumb interactive${t.id === templateId ? ' is-selected' : ''}`}
-                      aria-pressed={t.id === templateId ? 'true' : 'false'} onClick={() => setTemplateId(t.id)}>
+                      aria-pressed={t.id === templateId ? 'true' : 'false'} onClick={() => selectTemplate(t)}>
                       <canvas width={THUMB_W} height={THUMB_H}
                         ref={(el) => { if (el) thumbCanvases.current.set(t.id, el); else thumbCanvases.current.delete(t.id); }} />
                       <span>{t.name}</span>
@@ -497,19 +586,51 @@ export default function Studio({ song }: { song: StudioSong }) {
             {tool === 'text' && (
               <div class="studio__section">
                 {bilingual && (
-                  <div class="segmented studio__seg" role="group" aria-label="Script">
-                    {seg(script === 'ur', <span class="ur-label" lang="ur">اردو</span>, () => setScript('ur'))}
-                    {seg(script === 'both', 'Both', () => setScript('both'))}
-                    {seg(script === 'ro', 'Roman', () => setScript('ro'))}
+                  <div class="studio__field">
+                    <span class="studio__field-label">Script</span>
+                    <div class="segmented studio__seg" role="group" aria-label="Script">
+                      {seg(script === 'ur', <span class="ur-label" lang="ur">اردو</span>, () => setScript('ur'))}
+                      {seg(script === 'both', 'Both', () => setScript('both'))}
+                      {seg(script === 'ro', 'Roman', () => setScript('ro'))}
+                    </div>
                   </div>
                 )}
+                <div class="studio__field">
+                  <span class="studio__field-label">Font Style</span>
+                  <div class="segmented studio__seg" role="group" aria-label="Font Style">
+                    {seg(fontStyle === 'default', 'Standard', () => setFontStyle('default'))}
+                    {seg(fontStyle === 'serif', 'Serif', () => setFontStyle('serif'))}
+                    {seg(fontStyle === 'sans', 'Sans', () => setFontStyle('sans'))}
+                    {seg(fontStyle === 'nastaliq', 'Nastaliq', () => setFontStyle('nastaliq'))}
+                    {seg(fontStyle === 'mono', 'Mono', () => setFontStyle('mono'))}
+                  </div>
+                </div>
+                <div class="studio__field">
+                  <span class="studio__field-label">Text Animation</span>
+                  <div class="segmented studio__seg" role="group" aria-label="Text Animation">
+                    {seg(animOverride === 'default', 'Default', () => setAnimOverride('default'))}
+                    {seg(animOverride === 'word-karaoke', 'Karaoke', () => setAnimOverride('word-karaoke'))}
+                    {seg(animOverride === 'word-rise', 'Word Rise', () => setAnimOverride('word-rise'))}
+                    {seg(animOverride === 'drift', 'Drift', () => setAnimOverride('drift'))}
+                    {seg(animOverride === 'fade', 'Fade', () => setAnimOverride('fade'))}
+                    {seg(animOverride === 'rise', 'Rise', () => setAnimOverride('rise'))}
+                  </div>
+                </div>
+                <div class="studio__field">
+                  <span class="studio__field-label">Word Splitting</span>
+                  <div class="segmented studio__seg" role="group" aria-label="Word Splitting">
+                    {seg(wordSplit === 'full', 'Full Line', () => setWordSplit('full'))}
+                    {seg(wordSplit === 'chunk2', '2 Words', () => setWordSplit('chunk2'))}
+                    {seg(wordSplit === 'chunk3', '3-4 Words', () => setWordSplit('chunk3'))}
+                  </div>
+                </div>
                 <div class="studio__slider">
                   <div class="studio__slider-head">
                     <span>Text size</span>
                     <span class="studio__value">{Math.round(textScale * 100)}%</span>
                   </div>
-                  <input class="seek" type="range" min={0.7} max={1.4} step={0.05} value={textScale} aria-label="Text size"
-                    style={{ '--pct': `${((textScale - 0.7) / 0.7) * 100}%` }}
+                  <input class="seek" type="range" min={0.4} max={1.4} step={0.05} value={textScale} aria-label="Text size"
+                    style={{ '--pct': `${((textScale - 0.4) / 1.0) * 100}%` }}
                     onInput={(e) => setTextScale(Number((e.target as HTMLInputElement).value))} />
                 </div>
                 <div class="segmented studio__seg" role="group" aria-label="Text position">
@@ -532,24 +653,43 @@ export default function Studio({ song }: { song: StudioSong }) {
 
             {tool === 'background' && (
               <div class="studio__section">
-                <input ref={fileRef} type="file" accept="image/*" hidden
-                  onChange={(e) => onPhoto(e.currentTarget as HTMLInputElement)} />
+                <input ref={fileRef} type="file" accept="video/*,image/*" hidden
+                  onChange={(e) => onMedia(e.currentTarget as HTMLInputElement)} />
                 <div class="studio__actions">
-                  <Button variant="secondary" icon="upload" onClick={() => fileRef.current?.click()}>Upload photo</Button>
-                  {image && <Button variant="text" onClick={removePhoto}>Remove photo</Button>}
+                  <Button variant="secondary" icon="upload" onClick={() => fileRef.current?.click()}>
+                    {image && !selectedStockId ? 'Replace custom media' : 'Upload custom video/photo'}
+                  </Button>
+                  {image && <Button variant="text" onClick={removeMedia}>Use canvas artwork</Button>}
                 </div>
+
+                <div class="studio__field">
+                  <span class="studio__field-label">Curated Background Videos</span>
+                  <div class="studio__stock-list">
+                    {STOCK_VIDEOS.map((v) => (
+                      <button type="button" key={v.id}
+                        class={`studio__stock-item interactive${selectedStockId === v.id ? ' is-selected' : ''}`}
+                        aria-pressed={selectedStockId === v.id ? 'true' : 'false'}
+                        onClick={() => applyStockVideo(v)}>
+                        <span class="studio__stock-tag">{v.category}</span>
+                        <span class="studio__stock-title">{v.title}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {image && (
                   <div class="studio__slider">
                     <div class="studio__slider-head">
-                      <span>Darken photo</span>
+                      <span>{isVideoMedia ? 'Darken video' : 'Darken photo'}</span>
                       <span class="studio__value">{Math.round(imageDim * 100)}%</span>
                     </div>
-                    <input class="seek" type="range" min={0} max={0.8} step={0.05} value={imageDim} aria-label="Darken photo"
+                    <input class="seek" type="range" min={0} max={0.8} step={0.05} value={imageDim}
+                      aria-label={isVideoMedia ? 'Darken video' : 'Darken photo'}
                       style={{ '--pct': `${(imageDim / 0.8) * 100}%` }}
                       onInput={(e) => setImageDim(Number((e.target as HTMLInputElement).value))} />
                   </div>
                 )}
-                <p class="studio__note">Your photo stays on this device. It is never uploaded.</p>
+                <p class="studio__note">Curated videos stream from Cloudflare R2 and loop seamlessly behind your lyrics.</p>
               </div>
             )}
 

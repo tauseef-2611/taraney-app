@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { buildClip, defaultRange, flattenSong } from '../src/studio/clip';
-import type { FlatLine } from '../src/studio/types';
+import { buildClip, chunkStudioLines, defaultRange, flattenSong } from '../src/studio/clip';
+import type { FlatLine, StudioLine } from '../src/studio/types';
 import type { Recording, SongDoc } from '../src/lib/types';
 
 const fl = (key: string, start: number | null, end: number | null = null): FlatLine => {
@@ -169,5 +169,41 @@ describe('defaultRange', () => {
   it('always includes at least one line', () => {
     const huge = [fl('0:0', 0, 60000), fl('0:1', 60000, 120000)];
     expect(defaultRange(huge, 0)).toEqual([0, 0]);
+  });
+});
+
+describe('chunkStudioLines', () => {
+  it('leaves short lines untouched', () => {
+    const lines: StudioLine[] = [
+      { key: '0:0', ur: 'دو بول', ro: 'do bol', start: 1000, end: 3000 },
+    ];
+    expect(chunkStudioLines(lines, 2)).toEqual(lines);
+  });
+
+  it('splits a long line into chunks with proportional times', () => {
+    const lines: StudioLine[] = [
+      {
+        key: '0:0',
+        ur: 'یہ غازی یہ تیرے پر اسرار بندے',
+        ro: 'yeh ghazi yeh tere pur asrar bande',
+        start: 1000,
+        end: 7000,
+      },
+    ];
+    const chunked = chunkStudioLines(lines, 3);
+    expect(chunked).toHaveLength(3);
+    expect(chunked[0].key).toBe('0:0_c0');
+    expect(chunked[0].start).toBe(1000);
+    expect(chunked[0].end).toBe(3000);
+    expect(chunked[1].key).toBe('0:0_c1');
+    expect(chunked[1].start).toBe(3000);
+    expect(chunked[1].end).toBe(5000);
+    expect(chunked[2].key).toBe('0:0_c2');
+    expect(chunked[2].start).toBe(5000);
+    expect(chunked[2].end).toBe(7000);
+  });
+
+  it('handles empty input gracefully', () => {
+    expect(chunkStudioLines([], 2)).toEqual([]);
   });
 });

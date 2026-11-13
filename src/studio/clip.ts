@@ -97,3 +97,52 @@ export function defaultRange(flat: FlatLine[], startIndex = 0): [number, number]
   }
   return [s, e];
 }
+
+/**
+ * Splits lines into smaller word chunks (e.g. 2 words or 3 words per card),
+ * distributing each line's time span proportionally across the chunks.
+ */
+export function chunkStudioLines(lines: StudioLine[], chunkSize: 2 | 3): StudioLine[] {
+  if (!lines.length || chunkSize <= 0) return lines;
+  const out: StudioLine[] = [];
+
+  for (const line of lines) {
+    const urWords = line.ur.trim() ? line.ur.trim().split(/\s+/) : [];
+    const roWords = line.ro.trim() ? line.ro.trim().split(/\s+/) : [];
+
+    const maxWords = Math.max(urWords.length, roWords.length);
+    if (maxWords <= chunkSize) {
+      out.push(line);
+      continue;
+    }
+
+    const numChunks = Math.ceil(maxWords / chunkSize);
+    const lineDuration = line.end - line.start;
+    const chunkDuration = lineDuration / numChunks;
+
+    const urStep = urWords.length ? Math.ceil(urWords.length / numChunks) : 0;
+    const roStep = roWords.length ? Math.ceil(roWords.length / numChunks) : 0;
+
+    for (let c = 0; c < numChunks; c++) {
+      const start = Math.round(line.start + c * chunkDuration);
+      const end = Math.round(c === numChunks - 1 ? line.end : line.start + (c + 1) * chunkDuration);
+
+      const urPart = urWords.length
+        ? urWords.slice(c * urStep, (c + 1) * urStep).join(' ')
+        : '';
+      const roPart = roWords.length
+        ? roWords.slice(c * roStep, (c + 1) * roStep).join(' ')
+        : '';
+
+      out.push({
+        key: `${line.key}_c${c}`,
+        ur: urPart,
+        ro: roPart,
+        start,
+        end,
+      });
+    }
+  }
+
+  return out;
+}

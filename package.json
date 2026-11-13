@@ -25,6 +25,8 @@
     "ingest": "node --no-warnings --experimental-strip-types scripts/ingest.ts",
     "worker": "node --no-warnings --experimental-strip-types scripts/worker.ts",
     "worker:auto": "node --no-warnings --experimental-strip-types scripts/worker.ts --auto",
+    "r2:upload-videos": "node scripts/upload-stock-videos.mjs",
+    "r2:upload-videos:local": "node scripts/upload-stock-videos.mjs --local",
     "deploy": "npm run content:prod && npm run build && npx wrangler pages deploy dist --project-name=taraney --branch=main"
   },
   "dependencies": {

@@ -357,9 +357,17 @@ export function paintBackground(
   g.filter = 'none';
 
   if (image && iw > 0 && ih > 0) {
-    // Ping-pong zoom: 1 -> 1.06 -> 1 over 40s (20s each way).
+    const isVideo = typeof HTMLVideoElement !== 'undefined' && image instanceof HTMLVideoElement;
+    if (isVideo && image.duration && Number.isFinite(image.duration)) {
+      const targetTime = (t / 1000) % image.duration;
+      if (Math.abs(image.currentTime - targetTime) > 0.08) {
+        image.currentTime = targetTime;
+      }
+    }
+
+    // Ping-pong zoom for static images; video already has natural motion.
     const tri = frac(t / 40000) * 2;
-    const zoom = 1 + 0.06 * (tri < 1 ? tri : 2 - tri);
+    const zoom = isVideo ? 1 : 1 + 0.06 * (tri < 1 ? tri : 2 - tri);
     const scale = Math.max(w / iw, h / ih) * zoom;
     const dw = iw * scale, dh = ih * scale;
     g.drawImage(image, (w - dw) / 2, (h - dh) / 2, dw, dh);
