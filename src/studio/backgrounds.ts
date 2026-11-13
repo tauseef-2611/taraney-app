@@ -1,7 +1,7 @@
 // Animated background painter for Reel Studio. Pure function of its arguments: every particle
 // field comes from a seeded PRNG, and all motion is a periodic function of t (ms), so frames loop.
 import { hash32 } from '../lib/hash';
-import type { Template } from './types';
+import type { OverlayEffect, Template } from './types';
 
 type RGB = [number, number, number];
 interface Palette { deep: RGB; mid: RGB; light: RGB; tint: RGB }
@@ -316,6 +316,174 @@ function hasParticles(kind: Template['bg']): boolean {
   return kind === 'stars' || kind === 'rain' || kind === 'bokeh' || kind === 'embers';
 }
 
+function resolveEffect(tpl: Template, effect?: OverlayEffect): 'rain' | 'rays' | 'glow' | 'embers' | 'glitch' | 'film' | 'none' {
+  if (effect && effect !== 'auto') return effect;
+  switch (tpl.bg) {
+    case 'rain': return 'rain';
+    case 'rays': return 'rays';
+    case 'embers': return 'embers';
+    case 'bokeh':
+    case 'aurora':
+    case 'stars': return 'glow';
+    case 'paper': return 'film';
+    default: return 'none';
+  }
+}
+
+function overlayRain(g: CanvasRenderingContext2D, w: number, h: number, t: number, P: Palette, seed: string, s: number, intensity: number) {
+  const f = field(seed, 'overlay-rain', 140, 4);
+  g.save();
+  g.lineWidth = Math.max(1.2, s * 0.0018);
+  for (let i = 0; i < 140; i++) {
+    const x0 = f[i * 4], y0 = f[i * 4 + 1], sp = f[i * 4 + 2], al = f[i * 4 + 3];
+    const p = frac(y0 + t / (2000 + sp * 2200));
+    const y = -0.05 * h + p * 1.1 * h;
+    const x = (((x0 * w + p * 0.22 * h) % w) + w) % w;
+    const L = s * (0.035 + 0.055 * al);
+    g.strokeStyle = `rgba(240, 245, 255, ${(0.25 + 0.45 * al) * intensity})`;
+    g.beginPath();
+    g.moveTo(x, y);
+    g.lineTo(x + L * 0.22, y + L);
+    g.stroke();
+  }
+  // Droplet beads on camera glass
+  const df = field(seed, 'rain-glass-drops', 28, 4);
+  for (let i = 0; i < 28; i++) {
+    const gx = df[i * 4] * w;
+    const gy = df[i * 4 + 1] * h + ((t * 0.012 * (0.3 + df[i * 4 + 2])) % (h * 0.25));
+    const gr = s * (0.004 + 0.008 * df[i * 4 + 3]);
+    g.fillStyle = `rgba(255, 255, 255, ${0.18 * intensity})`;
+    g.beginPath();
+    g.arc(gx, gy % h, gr, 0, TAU);
+    g.fill();
+    g.fillStyle = `rgba(255, 255, 255, ${0.45 * intensity})`;
+    g.beginPath();
+    g.arc(gx - gr * 0.3, (gy % h) - gr * 0.3, gr * 0.35, 0, TAU);
+    g.fill();
+  }
+  g.restore();
+}
+
+function overlayRays(g: CanvasRenderingContext2D, w: number, h: number, t: number, P: Palette, seed: string, s: number, intensity: number) {
+  g.save();
+  g.globalCompositeOperation = 'screen';
+  const sx = w * 0.35, sy = -0.05 * h;
+  radial(g, sx, sy, s * 1.4, col(P.light, 0.45 * intensity), col(P.light, 0));
+  const f = field(seed, 'overlay-rays', 10, 2);
+  for (let i = 0; i < 10; i++) {
+    const a0 = f[i * 2], a1 = f[i * 2 + 1];
+    const sway = 0.09 * Math.sin((TAU * t) / (12000 + a0 * 5000) + a1 * TAU);
+    const ang = Math.PI * 0.32 + (i - 5) * 0.12 + sway;
+    const spread = 0.06 + 0.035 * a1;
+    const L = s * (1.8 + 0.5 * a0);
+    const pulse = 0.5 + 0.5 * Math.sin((TAU * t) / (4500 + a0 * 3500) + i);
+    g.fillStyle = col(P.tint, (0.08 + 0.14 * pulse) * intensity);
+    g.beginPath();
+    g.moveTo(sx, sy);
+    g.lineTo(sx + L * Math.cos(ang - spread), sy + L * Math.sin(ang - spread));
+    g.lineTo(sx + L * Math.cos(ang + spread), sy + L * Math.sin(ang + spread));
+    g.closePath();
+    g.fill();
+  }
+  g.restore();
+}
+
+function overlayGlow(g: CanvasRenderingContext2D, w: number, h: number, t: number, P: Palette, seed: string, s: number, intensity: number) {
+  g.save();
+  g.globalCompositeOperation = 'screen';
+  const f = field(seed, 'overlay-bokeh', 24, 4);
+  for (let i = 0; i < 24; i++) {
+    const x0 = f[i * 4], y0 = f[i * 4 + 1], sz = f[i * 4 + 2], ph = f[i * 4 + 3];
+    const p = frac(y0 + t / (14000 + ph * 8000));
+    const y = h * (1.05 - 1.12 * p);
+    const x = (x0 + 0.03 * Math.sin((TAU * t) / (8000 + ph * 5000) + ph * TAU)) * w;
+    const r = s * (0.04 + 0.10 * sz);
+    const pulse = 0.5 + 0.5 * Math.sin((TAU * t) / (2800 + ph * 2200) + ph * TAU);
+    radial(g, x, y, r, col(P.light, (0.12 + 0.16 * pulse) * intensity), col(P.light, 0));
+  }
+  const cx = w * (0.5 + 0.25 * Math.sin((TAU * t) / 18000));
+  const cy = h * (0.35 + 0.15 * Math.cos((TAU * t) / 22000));
+  radial(g, cx, cy, s * 1.1, col(P.light, 0.18 * intensity), col(P.light, 0));
+  g.restore();
+}
+
+function overlayEmbers(g: CanvasRenderingContext2D, w: number, h: number, t: number, P: Palette, seed: string, s: number, intensity: number) {
+  g.save();
+  g.globalCompositeOperation = 'screen';
+  radial(g, w / 2, h * 1.05, s * 1.1, col(P.light, 0.40 * intensity), col(P.light, 0));
+  const f = field(seed, 'overlay-embers', 75, 5);
+  for (let i = 0; i < 75; i++) {
+    const x0 = f[i * 5], ph = f[i * 5 + 1], sp = f[i * 5 + 2], sw = f[i * 5 + 3], sz = f[i * 5 + 4];
+    const p = frac(ph + t / (5000 + sp * 6000));
+    const y = h * (1.05 - 1.1 * p);
+    const x = (x0 + 0.02 * Math.sin((TAU * t) / (1800 + sw * 2000) + sw * TAU)) * w;
+    const tw = 0.5 + 0.5 * Math.sin((TAU * t) / (600 + sz * 800) + sw * TAU);
+    const a = Math.sin(Math.PI * p) * (0.6 + 0.4 * tw) * intensity;
+    const r = s * (0.002 + 0.0035 * sz);
+    g.fillStyle = `rgba(255, 230, 160, ${a})`;
+    g.beginPath();
+    g.arc(x, y, r, 0, TAU);
+    g.fill();
+    g.fillStyle = col(P.light, a * 0.45);
+    g.beginPath();
+    g.arc(x, y, r * 3.5, 0, TAU);
+    g.fill();
+  }
+  g.restore();
+}
+
+function overlayGlitch(g: CanvasRenderingContext2D, w: number, h: number, t: number, P: Palette, seed: string, s: number, intensity: number) {
+  g.save();
+  // CRT scanlines
+  g.fillStyle = `rgba(0, 0, 0, ${0.16 * intensity})`;
+  for (let y = 0; y < h; y += 4) {
+    g.fillRect(0, y, w, 1.5);
+  }
+  // Periodic horizontal VHS glitch slices
+  const cycle = (t / 800) % 1;
+  if (cycle < 0.35) {
+    const rnd = mulberry32(Math.floor(t / 250) + hash32(seed));
+    const sliceCount = 3;
+    for (let i = 0; i < sliceCount; i++) {
+      const sy = rnd() * (h - 40);
+      const sh = 6 + rnd() * 22;
+      const offset = (rnd() - 0.5) * 16 * intensity;
+      g.fillStyle = `rgba(0, 240, 255, ${0.14 * intensity})`;
+      g.fillRect(offset, sy, w, sh);
+      g.fillStyle = `rgba(255, 20, 140, ${0.14 * intensity})`;
+      g.fillRect(-offset, sy + 2, w, sh);
+    }
+  }
+  vignette(g, w, h, 0.45 * intensity);
+  g.restore();
+}
+
+function overlayFilm(g: CanvasRenderingContext2D, w: number, h: number, t: number, P: Palette, seed: string, s: number, intensity: number) {
+  g.save();
+  const f = field(`${seed}|${Math.floor(t / 80)}`, 'film-grain', 120, 3);
+  g.fillStyle = `rgba(255, 255, 255, ${0.12 * intensity})`;
+  for (let i = 0; i < 120; i++) {
+    const x = f[i * 3] * w, y = f[i * 3 + 1] * h;
+    const sz = 1 + f[i * 3 + 2] * 2.5;
+    g.fillRect(x, y, sz, sz);
+  }
+  const scratchCycle = (t / 1200) % 1;
+  if (scratchCycle < 0.25) {
+    const rnd = mulberry32(Math.floor(t / 300) + hash32(seed));
+    const x = rnd() * w;
+    g.strokeStyle = `rgba(255, 255, 255, ${0.28 * intensity})`;
+    g.lineWidth = 1;
+    g.beginPath();
+    g.moveTo(x, 0);
+    g.lineTo(x + (rnd() - 0.5) * 10, h);
+    g.stroke();
+  }
+  g.fillStyle = `rgba(215, 175, 130, ${0.08 * intensity})`;
+  g.fillRect(0, 0, w, h);
+  vignette(g, w, h, 0.35 * intensity);
+  g.restore();
+}
+
 interface SizedSource {
   naturalWidth?: number; naturalHeight?: number;
   videoWidth?: number; videoHeight?: number;
@@ -332,8 +500,7 @@ function srcSize(src: CanvasImageSource): [number, number] {
 
 /**
  * Paints one full background frame at time t (ms). Pure: same arguments give the same pixels.
- * With an image, the image is drawn cover-fit with a slow ping-pong zoom (1 to 1.06 over 20s),
- * darkened by imageDim (0..1, default 0.45), with a bottom-heavy vignette.
+ * With an image or video, draws cover-fit with color grading, dimming, and dynamic visual effect overlays.
  */
 export function paintBackground(
   g: CanvasRenderingContext2D,
@@ -344,6 +511,8 @@ export function paintBackground(
   seed: string,
   image?: CanvasImageSource | null,
   imageDim?: number,
+  overlayEffect?: OverlayEffect,
+  overlayIntensity?: number,
 ): void {
   const s = Math.min(w, h);
   const P = palette(tpl);
@@ -373,11 +542,30 @@ export function paintBackground(
     g.drawImage(image, (w - dw) / 2, (h - dh) / 2, dw, dh);
 
     const dim = imageDim === undefined ? 0.45 : clamp01(imageDim);
-    g.fillStyle = `rgba(0,0,0,${dim.toFixed(3)})`;
+
+    // Color grading tint from the template's color palette
+    g.fillStyle = col(P.deep, dim * 0.38);
     g.fillRect(0, 0, w, h);
 
-    if (hasParticles(kind)) particleLayer(g, w, h, t, kind, P, seed, s, 0.4);
+    // Readability veil
+    g.fillStyle = `rgba(0,0,0,${(dim * 0.82).toFixed(3)})`;
+    g.fillRect(0, 0, w, h);
 
+    // Visual effect overlay
+    const eff = resolveEffect(tpl, overlayEffect);
+    const k = overlayIntensity === undefined ? 0.8 : clamp01(overlayIntensity);
+    if (k > 0) {
+      switch (eff) {
+        case 'rain': overlayRain(g, w, h, t, P, seed, s, k); break;
+        case 'rays': overlayRays(g, w, h, t, P, seed, s, k); break;
+        case 'glow': overlayGlow(g, w, h, t, P, seed, s, k); break;
+        case 'embers': overlayEmbers(g, w, h, t, P, seed, s, k); break;
+        case 'glitch': overlayGlitch(g, w, h, t, P, seed, s, k); break;
+        case 'film': overlayFilm(g, w, h, t, P, seed, s, k); break;
+      }
+    }
+
+    // Bottom gradient for lyric grounding
     const bottom = g.createLinearGradient(0, 0, 0, h);
     bottom.addColorStop(0, 'rgba(0,0,0,0)');
     bottom.addColorStop(0.5, 'rgba(0,0,0,0.15)');

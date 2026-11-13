@@ -31,6 +31,7 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(req.url);
   if (req.method !== 'GET' || url.origin !== location.origin) return;
   if (url.pathname.startsWith('/admin') || url.pathname.startsWith('/api/admin') || url.pathname.startsWith('/api/auth')) return;
+  if (url.pathname.startsWith('/stock-videos/')) return;
 
   // Audio saved for offline
   if (url.pathname.startsWith('/api/media/') || url.pathname.startsWith('/samples/')) {

@@ -1,5 +1,6 @@
 // Share a couplet: pick 1-4 lines, choose a format and script, preview, then share or download.
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { createPortal } from 'preact/compat';
 import { Icon } from '../components/ui/Icon';
 import { Button, Chip, IconButton } from '../components/ui/controls';
 import { FORMATS, renderCard, shareOrDownload, toBlob, download, type Format } from './share-card';
@@ -15,7 +16,8 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
     document.body.style.overflow = 'hidden';
     return () => { window.removeEventListener('keydown', on); document.body.style.overflow = prev; };
   }, []);
-  return (
+
+  const content = (
     <>
       <div class="sheet-backdrop" onClick={onClose} />
       <div class="sheet" role="dialog" aria-modal="true" aria-label={title}>
@@ -25,6 +27,11 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
       </div>
     </>
   );
+
+  if (typeof document !== 'undefined' && document.body) {
+    return createPortal(content, document.body);
+  }
+  return content;
 }
 
 export default function ShareSheet({ song, options, initial, onClose }: {

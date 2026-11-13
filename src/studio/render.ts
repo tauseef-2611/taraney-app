@@ -619,7 +619,7 @@ export function drawFrame(g: CanvasRenderingContext2D, p: Project, t: number): v
 
   g.save();
   resetState(g);
-  paintBackground(g, w, h, t, tpl, p.seed, p.image, p.imageDim);
+  paintBackground(g, w, h, t, tpl, p.seed, p.image, p.imageDim, p.overlayEffect, p.overlayIntensity);
   resetState(g);
 
   const c: Ctx = { g, p, t, w, h, k, maxW: w * TEXT_W, cy: h * ANCHOR[p.position] };

@@ -140,8 +140,38 @@ body:has(.app-main) { overflow-x: clip; }
 .follow-chip { position: fixed; z-index: 22; left: 50%; transform: translateX(-50%); bottom: calc(var(--tabbar-h) + var(--miniplayer-h) + var(--space-6)); }
 
 /* Bottom sheet */
-.sheet-backdrop { position: fixed; inset: 0; z-index: 40; background: color-mix(in oklab, var(--color-scrim) 55%, transparent); animation: fade var(--dur-medium) var(--ease-standard); }
-.sheet { position: fixed; z-index: 41; inset: auto 0 0 0; max-height: 92dvh; overflow-y: auto; margin: 0 auto; max-width: 620px; padding: var(--space-4) var(--space-6) calc(var(--space-7) + env(safe-area-inset-bottom)); border-radius: var(--radius-2xl) var(--radius-2xl) 0 0; background: var(--color-surface-container); box-shadow: var(--elevation-3); display: grid; gap: var(--space-5); animation: rise var(--dur-long) var(--ease-emphasized); }
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: color-mix(in oklab, var(--color-scrim) 55%, transparent);
+  animation: fade var(--dur-medium) var(--ease-standard);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+.sheet {
+  position: fixed;
+  z-index: 81;
+  inset: auto 0 0 0;
+  max-height: 92dvh;
+  overflow-y: auto;
+  margin: 0 auto;
+  max-width: 620px;
+  padding: var(--space-4) var(--space-6) calc(var(--space-7) + env(safe-area-inset-bottom));
+  border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
+  background: var(--color-surface-container);
+  box-shadow: var(--elevation-4);
+  display: grid;
+  gap: var(--space-5);
+  animation: rise var(--dur-long) var(--ease-emphasized);
+}
+@media (min-width: 640px) {
+  .sheet {
+    bottom: var(--space-6);
+    border-radius: var(--radius-2xl);
+    border: 1px solid var(--color-outline-variant);
+  }
+}
 .sheet__grip { width: 40px; height: 4px; border-radius: 4px; background: var(--color-outline-variant); justify-self: center; }
 .sheet__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
 .sheet__line [lang="ur"] { font: var(--type-lyric-ur-sm); text-align: right; }

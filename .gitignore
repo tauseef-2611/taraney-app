@@ -8,6 +8,6 @@ public/samples/
 *.log
 src/data/*.generated.json
 .ingest/
-stock-videos/
+/stock-videos/
 test/
 scripts/

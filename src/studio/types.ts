@@ -26,6 +26,7 @@ export type TextAnim = 'fade' | 'rise' | 'zoom' | 'blur' | 'wipe' | 'word-rise' 
 export type FrameKind = 'none' | 'border' | 'corners' | 'bar';
 export type FontStyle = 'default' | 'serif' | 'sans' | 'nastaliq' | 'mono';
 export type WordSplit = 'full' | 'chunk2' | 'chunk3';
+export type OverlayEffect = 'auto' | 'rain' | 'rays' | 'glow' | 'embers' | 'glitch' | 'film' | 'none';
 
 export interface Template {
   id: string;
@@ -73,6 +74,8 @@ export interface Project {
   seed: string;
   fontStyle?: FontStyle;
   animOverride?: TextAnim;
+  overlayEffect?: OverlayEffect;
+  overlayIntensity?: number;
 }
 
 export interface ExportResult { blob: Blob; ext: 'mp4' | 'webm'; mime: string }

@@ -7,7 +7,7 @@ import { Icon, type IconName } from '../components/ui/Icon';
 import { Button, Chip, IconButton, Progress } from '../components/ui/controls';
 import { Sheet } from './ShareSheet';
 import { player } from './store';
-import { FORMATS, type Clip, type ExportResult, type FontStyle, type FormatKey, type Project, type Script, type Template, type TextAnim, type TextPosition, type WordSplit } from '../studio/types';
+import { FORMATS, type Clip, type ExportResult, type FontStyle, type FormatKey, type OverlayEffect, type Project, type Script, type Template, type TextAnim, type TextPosition, type WordSplit } from '../studio/types';
 import { DEFAULT_TEMPLATE_ID, TEMPLATES, TEMPLATE_BY_ID, recommendedTemplates, templatesForMood } from '../studio/templates';
 import { activeIndex, drawFrame, ensureStudioFonts } from '../studio/render';
 import { MAX_CLIP_MS, buildClip, chunkStudioLines, defaultRange, flattenSong } from '../studio/clip';
@@ -42,6 +42,17 @@ const SHAPE: Record<FormatKey, [number, number]> = { reel: [36, 64], square: [48
 const PX_PER_MS = 0.07;
 const THUMB_W = 270;
 const THUMB_H = 480;
+
+const EFFECT_OPTIONS: { key: OverlayEffect; label: string }[] = [
+  { key: 'auto', label: 'Template' },
+  { key: 'rain', label: 'Rain' },
+  { key: 'rays', label: 'Sun Rays' },
+  { key: 'glow', label: 'Dream Glow' },
+  { key: 'embers', label: 'Embers' },
+  { key: 'glitch', label: 'Glitch' },
+  { key: 'film', label: 'Film Grain' },
+  { key: 'none', label: 'None' },
+];
 
 const errText = (e: unknown): string => (e instanceof Error && e.message ? e.message : 'Something went wrong. Try again.');
 const isAbort = (e: unknown): boolean => typeof e === 'object' && e !== null && 'name' in e && (e as { name: unknown }).name === 'AbortError';
@@ -87,6 +98,8 @@ export default function Studio({ song }: { song: StudioSong }) {
   const [isVideoMedia, setIsVideoMedia] = useState(false);
   const [selectedStockId, setSelectedStockId] = useState<string | null>(() => initialTpl.suggestedVideoId ?? null);
   const [imageDim, setImageDim] = useState(0.45);
+  const [overlayEffect, setOverlayEffect] = useState<OverlayEffect>('auto');
+  const [overlayIntensity, setOverlayIntensity] = useState(0.8);
   const [tool, setTool] = useState<Tool>('templates');
   const [tplMood, setTplMood] = useState<Mood | 'rec'>('rec');
   const [notice, setNotice] = useState('');
@@ -138,13 +151,15 @@ export default function Studio({ song }: { song: StudioSong }) {
       setNotice(`Background video: ${v.title}`);
     };
     vid.onerror = () => {
-      if (vid.src !== v.fallbackUrl) {
+      if (vid.src.includes('/stock-videos/')) {
+        vid.src = `/api/media/${v.r2Key}`;
+      } else if (vid.src !== v.fallbackUrl) {
         vid.src = v.fallbackUrl;
       } else {
         setNotice('Could not stream that background video.');
       }
     };
-    vid.src = `/api/media/${v.r2Key}`;
+    vid.src = `/stock-videos/${v.id}.mp4`;
   };
 
   const selectTemplate = (t: Template) => {
@@ -168,7 +183,9 @@ export default function Studio({ song }: { song: StudioSong }) {
     textScale, position, image, imageDim, seed: song.id,
     fontStyle,
     animOverride: animOverride === 'default' ? undefined : animOverride,
-  }), [script, clip, title, subtitle, showTitle, showBrand, showProgress, textScale, position, image, imageDim, song.id, fontStyle, animOverride]);
+    overlayEffect,
+    overlayIntensity,
+  }), [script, clip, title, subtitle, showTitle, showBrand, showProgress, textScale, position, image, imageDim, song.id, fontStyle, animOverride, overlayEffect, overlayIntensity]);
   const project: Project = useMemo(() => ({ ...base, template, format }), [base, template, format]);
 
   // Refs read by the frame loop, so it never needs re-subscribing.
@@ -666,13 +683,12 @@ export default function Studio({ song }: { song: StudioSong }) {
                   <span class="studio__field-label">Curated Background Videos</span>
                   <div class="studio__stock-list">
                     {STOCK_VIDEOS.map((v) => (
-                      <button type="button" key={v.id}
-                        class={`studio__stock-item interactive${selectedStockId === v.id ? ' is-selected' : ''}`}
-                        aria-pressed={selectedStockId === v.id ? 'true' : 'false'}
-                        onClick={() => applyStockVideo(v)}>
-                        <span class="studio__stock-tag">{v.category}</span>
-                        <span class="studio__stock-title">{v.title}</span>
-                      </button>
+                      <StockVideoCard
+                        key={v.id}
+                        video={v}
+                        selected={selectedStockId === v.id}
+                        onSelect={() => applyStockVideo(v)}
+                      />
                     ))}
                   </div>
                 </div>
@@ -689,7 +705,29 @@ export default function Studio({ song }: { song: StudioSong }) {
                       onInput={(e) => setImageDim(Number((e.target as HTMLInputElement).value))} />
                   </div>
                 )}
-                <p class="studio__note">Curated videos stream from Cloudflare R2 and loop seamlessly behind your lyrics.</p>
+
+                <div class="studio__field">
+                  <span class="studio__field-label">Visual Effect Overlay</span>
+                  <div class="studio__seg studio__seg--wrap">
+                    {EFFECT_OPTIONS.map((eff) =>
+                      seg(overlayEffect === eff.key, eff.label, () => setOverlayEffect(eff.key))
+                    )}
+                  </div>
+                </div>
+
+                {overlayEffect !== 'none' && (
+                  <div class="studio__slider">
+                    <div class="studio__slider-head">
+                      <span>Effect intensity</span>
+                      <span class="studio__value">{Math.round(overlayIntensity * 100)}%</span>
+                    </div>
+                    <input class="seek" type="range" min={0.2} max={1} step={0.05} value={overlayIntensity}
+                      aria-label="Effect intensity"
+                      style={{ '--pct': `${((overlayIntensity - 0.2) / 0.8) * 100}%` }}
+                      onInput={(e) => setOverlayIntensity(Number((e.target as HTMLInputElement).value))} />
+                  </div>
+                )}
+                <p class="studio__note">Curated videos stream directly from high-speed CDN with dynamic template effects.</p>
               </div>
             )}
 
@@ -760,5 +798,57 @@ export default function Studio({ song }: { song: StudioSong }) {
         </Sheet>
       )}
     </div>
+  );
+}
+
+function StockVideoCard({
+  video: v,
+  selected,
+  onSelect,
+}: {
+  video: StockVideo;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const vidRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const el = vidRef.current;
+    if (!el) return;
+    if (selected) {
+      el.play().catch(() => {});
+    } else {
+      el.pause();
+      el.currentTime = 0;
+    }
+  }, [selected]);
+
+  return (
+    <button
+      type="button"
+      class={`studio__stock-item interactive${selected ? ' is-selected' : ''}`}
+      aria-pressed={selected ? 'true' : 'false'}
+      onClick={onSelect}
+      onMouseEnter={() => vidRef.current?.play().catch(() => {})}
+      onMouseLeave={() => {
+        if (!selected && vidRef.current) {
+          vidRef.current.pause();
+          vidRef.current.currentTime = 0;
+        }
+      }}
+    >
+      <div class="studio__stock-preview">
+        <video
+          ref={vidRef}
+          src={`/stock-videos/${v.id}.mp4#t=0.001`}
+          muted
+          loop
+          playsInline
+          preload="metadata"
+        />
+        <span class="studio__stock-tag">{v.category}</span>
+      </div>
+      <span class="studio__stock-title">{v.title}</span>
+    </button>
   );
 }

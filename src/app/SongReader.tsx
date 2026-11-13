@@ -133,7 +133,7 @@ export default function SongReader({ song }: { song: ReaderSong }) {
       <p class="read-hint"><Icon name="info" /> Tap a line to {synced ? 'play, ' : ''}share or suggest a fix</p>
 
       <div ref={lyricsRef} class="read-lyrics">
-        <Lyrics blocks={blocks} mode={mode} surface="paper" synced={mine && synced} active={cue?.key} past={past}
+        <Lyrics blocks={blocks} mode={mode} surface="paper" synced={mine && synced} active={cue?.key} selected={sheet ? `${sheet.occ}:${sheet.line}` : null} past={past}
           onLine={(occ, line) => setSheet({ occ, line })} compactRepeats={!mine} />
       </div>
 

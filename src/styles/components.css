@@ -248,6 +248,14 @@ button.lyric-line { cursor: pointer; }
 .lyrics--paper .lyric-line .ro { color: var(--color-ink-2); }
 .lyric-line .ur + .ro { margin-top: calc(var(--space-2) * -1); }
 .lyric-line--uncertain .ur, .lyric-line--uncertain .ro { text-decoration: underline dotted var(--color-outline); text-underline-offset: 6px; }
+.lyric-line.is-selected {
+  background: color-mix(in oklab, var(--color-accent) 14%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-accent) 40%, transparent);
+}
+.lyrics--paper .lyric-line.is-selected {
+  background: color-mix(in oklab, var(--color-ink-accent) 12%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-ink-accent) 35%, transparent);
+}
 .lyrics[data-mode='ur'] .ro, .lyrics[data-mode='ro'] .ur { display: none; }
 .lyrics[data-mode='ro'] .ro { font: var(--type-title-lg); font-weight: 500; color: inherit; }
 /* Synced lines dim by COLOUR, not opacity, so every state keeps audited contrast in both themes. */

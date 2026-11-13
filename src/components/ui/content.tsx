@@ -111,9 +111,9 @@ export function SongHeader({ song, reviewed = true }: { song: CardSong; reviewed
 }
 
 /** Lyrics in sung order. `active` is "occ:line"; with `onLine`, lines become tappable buttons. */
-export function Lyrics({ blocks, mode = 'both', surface = 'dark', synced = false, active, past, onLine, compactRepeats = false }: {
+export function Lyrics({ blocks, mode = 'both', surface = 'dark', synced = false, active, selected, past, onLine, compactRepeats = false }: {
   blocks: SungBlock[]; mode?: 'ur' | 'both' | 'ro'; surface?: 'dark' | 'paper'; synced?: boolean;
-  active?: string | null; past?: Set<string>; onLine?: (occ: number, line: number) => void; compactRepeats?: boolean;
+  active?: string | null; selected?: string | null; past?: Set<string>; onLine?: (occ: number, line: number) => void; compactRepeats?: boolean;
 }) {
   const c = ['lyrics', surface === 'paper' && 'lyrics--paper', synced && 'is-synced'].filter(Boolean).join(' ');
   return (
@@ -126,7 +126,7 @@ export function Lyrics({ blocks, mode = 'both', surface = 'dark', synced = false
           <section class={`lyric-block lyric-block--${b.type}${b.repeat ? ' lyric-block--repeat' : ''}`} data-occ={b.occ}>
             {b.lines.map((l) => {
               const key = `${b.occ}:${l.line}`;
-              const cls = ['lyric-line', key === active && 'is-active', past?.has(key) && 'is-past', l.uncertain && 'lyric-line--uncertain'].filter(Boolean).join(' ');
+              const cls = ['lyric-line', key === active && 'is-active', key === selected && 'is-selected', past?.has(key) && 'is-past', l.uncertain && 'lyric-line--uncertain'].filter(Boolean).join(' ');
               const body = [
                 l.ur && <span class="ur" lang="ur">{l.ur}</span>,
                 l.ro && <span class="ro" lang="ur-Latn">{l.ro}</span>,
